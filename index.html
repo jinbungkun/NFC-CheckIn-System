@@ -27,8 +27,6 @@
     .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 8px; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-success { background: var(--success); color: white; }
-    .btn-accent { background: var(--accent); color: white; }
-    .btn-danger { background: var(--danger); color: white; }
 
     .student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; }
     .student-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 10px; margin-bottom: 10px; }
@@ -61,9 +59,9 @@
   </div>
 
   <div id="page-settings" class="page">
-    <h2>⚙️ 시스템 설정</h2>
-    <input type="text" id="cfg-url" placeholder="구글 앱 스크립트 배포 URL">
-    <button class="btn btn-primary" onclick="saveSettings()">설정 저장</button>
+    <h2>⚙️ 설정</h2>
+    <input type="text" id="cfg-url" placeholder="구글 앱 스크립트 URL">
+    <button class="btn btn-primary" onclick="saveSettings()">저장</button>
   </div>
 
   <div id="page-checkin" class="page active">
@@ -76,28 +74,19 @@
 
   <div id="page-search" class="page">
     <h2>🔍 정보 조회</h2>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="search-input" placeholder="이름 검색...">
-      <button class="btn btn-primary" style="width:80px;" onclick="findStudent('search')">검색</button>
-    </div>
+    <input type="text" id="search-input" placeholder="이름 검색..." onkeydown="if(event.key==='Enter') findStudent('search')">
     <div id="search-results"></div>
   </div>
 
   <div id="page-point" class="page">
     <h2>💰 포인트 지급</h2>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="point-search-input" placeholder="이름 검색 또는 카드 태그">
-      <button class="btn btn-primary" style="width:80px;" onclick="findStudent('point')">검색</button>
-    </div>
+    <input type="text" id="point-search-input" placeholder="이름 검색 또는 카드 태그" onkeydown="if(event.key==='Enter') findStudent('point')">
     <div id="point-target-area"></div>
   </div>
 
   <div id="page-card" class="page">
     <h2>💳 카드 교체</h2>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="card-search-input" placeholder="교체할 학생 이름 검색">
-      <button class="btn btn-primary" style="width:80px;" onclick="findStudent('card')">검색</button>
-    </div>
+    <input type="text" id="card-search-input" placeholder="교체할 학생 이름 검색" onkeydown="if(event.key==='Enter') findStudent('card')">
     <div id="card-target-area"></div>
   </div>
 
@@ -116,7 +105,6 @@
     const nfcBridge = document.getElementById('nfc-bridge');
     const statusBadge = document.getElementById('mode-status');
 
-    // 1. 기본 시스템 로직
     function focusNfc() {
       if (!isUserTyping && document.activeElement.tagName !== 'INPUT') {
         nfcBridge.focus();
@@ -158,25 +146,35 @@
       }
     }
 
-    // 2. 검색 및 조회 로직
+    // [핵심] 검색 및 스마트 점프 로직
     async function findStudent(pageType) {
       const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
-      const name = document.getElementById(inputId).value;
+      const name = document.getElementById(inputId).value.trim();
+      if(!name) return;
+
       const res = await callApi({ action: 'searchName', name: name });
       const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
       if(res && res.data) {
-        res.data.forEach(s => {
-          const div = document.createElement('div');
-          div.className = 'student-info-card';
-          div.style.cursor = 'pointer';
-          div.innerHTML = `<div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div>
-                           <div style="font-size:0.85rem; color:var(--muted)">ID: ${s.id} | ${s.phone || '번호없음'}</div>`;
-          div.onclick = () => renderActionArea(s, pageType);
-          container.appendChild(div);
-        });
+        // 결과가 1명일 경우 바로 액션 영역으로 점프
+        if(res.data.length === 1) {
+          renderActionArea(res.data[0], pageType);
+        } else {
+          // 중복 이름이 있을 경우만 목록 표시
+          res.data.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'student-info-card';
+            div.style.cursor = 'pointer';
+            div.innerHTML = `<div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div>
+                             <div style="font-size:0.85rem; color:var(--muted)">ID: ${s.id} | ${s.phone || '번호없음'}</div>`;
+            div.onclick = () => renderActionArea(s, pageType);
+            container.appendChild(div);
+          });
+        }
+      } else {
+        alert("검색 결과가 없습니다.");
       }
     }
 
@@ -189,15 +187,14 @@
       }
     }
 
-    // 3. 페이지별 액션 영역 생성 (포인트 버튼 / 카드 교체창)
     function renderActionArea(s, type) {
-      const containerId = type === 'point' ? 'point-target-area' : 'card-target-area';
+      const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
       
       if(type === 'point') {
         container.innerHTML = `
           <div class="student-info-card" style="border-left:5px solid var(--success)">
-            <div class="student-header"><span class="student-name">${s.name}님 선택됨</span><span class="student-point" id="cur-pt">${s.point} pt</span></div>
+            <div class="student-header"><span class="student-name">${s.name}님</span><span class="student-point" id="cur-pt">${s.point} pt</span></div>
             <div class="point-grid">
               <button class="btn btn-success" onclick="updatePt('${s.id}', 100)">+100</button>
               <button class="btn btn-success" onclick="updatePt('${s.id}', 300)">+300</button>
@@ -205,7 +202,7 @@
               <button class="btn btn-success" onclick="updatePt('${s.id}', 1000)">+1000</button>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px;">
-              <input type="number" id="direct-pt" placeholder="직접 입력" style="margin:0;">
+              <input type="number" id="direct-pt" placeholder="기타 점수" style="margin:0;">
               <button class="btn btn-primary" style="width:70px; margin:0;" onclick="updatePt('${s.id}', 'direct')">지급</button>
             </div>
           </div>`;
@@ -219,10 +216,15 @@
               <button class="btn btn-danger" style="width:70px; margin:0;" onclick="execCardChange('${s.id}', '${s.name}')">교체</button>
             </div>
           </div>`;
+      } else if(type === 'search') {
+        container.innerHTML = `
+          <div class="student-info-card">
+            <div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div>
+            <div style="font-size:0.9rem; color:var(--muted)">ID: ${s.id} | 연락처: ${s.phone || '미등록'}</div>
+          </div>`;
       }
     }
 
-    // 4. 포인트 및 카드교체 실행
     async function updatePt(id, amt) {
       const val = amt === 'direct' ? document.getElementById('direct-pt').value : amt;
       if(!val) return;
@@ -243,7 +245,6 @@
       }
     }
 
-    // --- 기본 통신 및 유틸리티 ---
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
       if(!url) { showPage('settings'); return null; }
@@ -277,11 +278,7 @@
       focusNfc();
     }
 
-    window.onload = () => {
-      const url = localStorage.getItem('GAS_URL');
-      if(url) document.getElementById('cfg-url').value = url;
-      focusNfc();
-    };
+    window.onload = () => { if(localStorage.getItem('GAS_URL')) document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL'); focusNfc(); };
     document.body.onclick = (e) => { if (e.target.tagName !== 'INPUT') { isUserTyping = false; focusNfc(); } };
   </script>
 </body>
