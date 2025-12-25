@@ -49,6 +49,7 @@
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     
+    /* 리더기 전용 브릿지: 키보드 팝업 방지 */
     #nfc-bridge { position: absolute; left: -9999px; top: 0; }
   </style>
 </head>
@@ -124,12 +125,12 @@
     <button class="btn btn-primary" onclick="saveSettings()">설정 저장</button>
   </div>
 
-  <input type="text" id="nfc-bridge">
+  <input type="text" id="nfc-bridge" inputmode="none">
 
   <script>
     let isAdmin = false;
     let isUserTyping = false;
-    let isApiLoading = false; // [추가] API 통신 중 포커스 방지
+    let isApiLoading = false;
     const nfcBridge = document.getElementById('nfc-bridge');
     const statusBadge = document.getElementById('mode-status');
 
@@ -160,44 +161,39 @@
     }
 
     function showPage(p) {
-      // [추가] 메뉴 이동 시 즉시 키보드를 닫음
-      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+      // 1. 카테고리 전환 시 현재 떠있는 모든 키보드를 즉시 강제 종료
+      if (document.activeElement) {
         document.activeElement.blur();
       }
       
       if(!isAdmin && p !== 'checkin') return;
 
-      // 입력값 초기화
       document.querySelectorAll('input').forEach(input => {
         if(input.id !== 'cfg-url' && input.id !== 'cfg-pw') input.value = ""; 
       });
 
-      // 결과 영역 초기화
       const containers = ['search-results', 'point-target-area', 'card-target-area'];
       containers.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ""; });
 
-      // 페이지 전환
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       const targetPage = document.getElementById('page-' + p);
       if(targetPage) targetPage.classList.add('active');
 
-      // 네비게이션 활성화 표시
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       const activeBtn = document.getElementById('nav-' + p);
       if(activeBtn) activeBtn.classList.add('active');
       
-      // 상태값 초기화 및 포커스 복구
       isUserTyping = false;
       isApiLoading = false;
       window.scrollTo(0,0);
 
-      // 키보드가 내려갈 시간을 준 뒤 NFC 리더기 포커스 시도
-      setTimeout(focusNfc, 300);
+      // 키보드가 내려가고 나서 리더기용 포커스를 잡음 (inputmode="none"이라 키보드 안 올라옴)
+      setTimeout(focusNfc, 500);
     }
 
     function focusNfc() {
-      // 타이핑 중이거나 API 통신 중이면 포커스 가로채지 않음 (키보드 튐 방지 핵심)
-      if (isUserTyping || isApiLoading || document.activeElement.tagName === 'INPUT') return;
+      // 사용자가 수동 입력창을 건드리고 있다면 리더기가 포커스를 뺏지 않음
+      if (isUserTyping || isApiLoading) return;
       
       nfcBridge.focus({ preventScroll: true });
       if(!isAdmin) {
@@ -207,15 +203,18 @@
     }
 
     document.querySelectorAll('input').forEach(el => {
-      el.addEventListener('focus', () => { isUserTyping = true; });
-      el.addEventListener('blur', () => { 
-        isUserTyping = false; 
-        // 포커스 복구 지연 시간을 늘려 모바일 키보드 정리 시간 확보
-        setTimeout(focusNfc, 800); 
-      });
+      // nfc-bridge를 제외한 일반 입력창 클릭 시에만 키보드 허용
+      if (el.id !== 'nfc-bridge') {
+        el.addEventListener('focus', () => { isUserTyping = true; });
+        el.addEventListener('blur', () => { 
+          isUserTyping = false; 
+          setTimeout(focusNfc, 800); 
+        });
+      }
+      
       el.addEventListener('keypress', (e) => {
         if(e.key === 'Enter') {
-          e.target.blur(); // 키보드 닫기
+          e.target.blur(); // 엔터 시 키보드 닫기
           const activePage = document.querySelector('.page.active').id;
           if(activePage === 'page-checkin') doCheckin();
           else if(activePage === 'page-search') findStudent('search');
@@ -241,14 +240,14 @@
       } else if(isAdmin) {
         if(activePage === 'page-point') findStudentByNfc(val, 'point');
         else if(activePage === 'page-card') {
-          if(document.getElementById('new-card-input')) document.getElementById('new-card-input').value = val;
+          const newInp = document.getElementById('new-card-input');
+          if(newInp) { newInp.value = val; execCardChange(null, "태그된"); }
           else findStudentByNfc(val, 'card');
         } else if(activePage === 'page-add') document.getElementById('add-id').value = val;
       }
     }
 
     async function findStudent(pageType) {
-      // 버튼 클릭 시 즉시 포커스 해제하여 키보드 내림
       document.activeElement.blur();
       isUserTyping = false;
 
@@ -260,6 +259,7 @@
       const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
       container.innerHTML = "";
+      
       if(res && res.data && res.data.length > 0) {
         if(res.data.length === 1) renderActionArea(res.data[0], pageType);
         else {
@@ -313,10 +313,13 @@
     }
 
     async function execCardChange(oldId, name) {
-      const newId = document.getElementById('new-card-input').value;
+      const newInp = document.getElementById('new-card-input');
+      const newId = newInp ? newInp.value : "";
       if(!newId) return alert("새 카드를 태그하세요.");
+      
+      // oldId가 null이면 현재 검색된 카드의 정보를 찾아야 함 (NFC 바로 교체 케이스 대응)
       if(confirm(`${name}님의 카드를 교체할까요?`)) {
-        const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId });
+        const res = await callApi({ action: 'updateId', oldId: oldId || document.querySelector('.student-info-card p').innerText.split(': ')[1], newId: newId });
         if(res) { alert("교체 완료"); showPage('checkin'); }
       }
     }
@@ -324,23 +327,21 @@
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
       if(!url) { showPage('settings'); return null; }
-      
-      isApiLoading = true; // [중요] API 시작 시 포커스 이동 차단
+      isApiLoading = true;
       document.getElementById('loader').style.display = 'flex';
-      
       try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         return await res.json();
       } catch (e) { alert("연결 실패"); return null; }
       finally { 
         document.getElementById('loader').style.display = 'none';
-        isApiLoading = false; // API 종료
-        setTimeout(focusNfc, 1000); // 넉넉하게 시간을 두고 리더기 모드로 복구
+        isApiLoading = false; 
+        setTimeout(focusNfc, 1000); 
       }
     }
 
     async function doCheckin() {
-      document.activeElement.blur(); // 키보드 닫기
+      document.activeElement.blur();
       const val = document.getElementById('manual-id').value;
       if(!val) return;
       const res = await callApi({ action: 'checkin', id: val });
@@ -368,7 +369,12 @@
       focusNfc();
     };
     
-    document.body.onclick = (e) => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { isUserTyping = false; focusNfc(); } };
+    document.body.onclick = (e) => { 
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { 
+        isUserTyping = false; 
+        focusNfc(); 
+      } 
+    };
   </script>
 </body>
 </html>
