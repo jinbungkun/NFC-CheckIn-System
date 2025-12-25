@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NFC Attendance & Management</title>
+  <title>NFC Attendance System</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
@@ -146,7 +146,33 @@
       }
     }
 
-    // [핵심] 검색 및 스마트 점프 로직
+    // [핵심 로직] 페이지 전환 시 모든 데이터 초기화
+    function showPage(p) {
+      // 1. 모든 입력 필드 초기화
+      document.querySelectorAll('input').forEach(input => {
+        if(input.id !== 'cfg-url') input.value = ""; 
+      });
+
+      // 2. 검색 결과 및 액션 영역 초기화
+      const containers = ['search-results', 'point-target-area', 'card-target-area'];
+      containers.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.innerHTML = "";
+      });
+
+      // 3. 페이지 활성화 처리
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.getElementById('page-' + p).classList.add('active');
+      
+      // 4. 네비게이션 버튼 활성화 처리
+      document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.querySelector(`.nav button[onclick="showPage('${p}')"]`);
+      if(activeBtn) activeBtn.classList.add('active');
+
+      isUserTyping = false;
+      focusNfc();
+    }
+
     async function findStudent(pageType) {
       const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
       const name = document.getElementById(inputId).value.trim();
@@ -158,11 +184,9 @@
       container.innerHTML = "";
 
       if(res && res.data) {
-        // 결과가 1명일 경우 바로 액션 영역으로 점프
         if(res.data.length === 1) {
           renderActionArea(res.data[0], pageType);
         } else {
-          // 중복 이름이 있을 경우만 목록 표시
           res.data.forEach(s => {
             const div = document.createElement('div');
             div.className = 'student-info-card';
@@ -268,15 +292,6 @@
     }
 
     function saveSettings() { localStorage.setItem('GAS_URL', document.getElementById('cfg-url').value.trim()); location.reload(); }
-
-    function showPage(p) {
-      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-      document.getElementById('page-' + p).classList.add('active');
-      document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
-      document.getElementById('nav-' + p).classList.add('active');
-      isUserTyping = false;
-      focusNfc();
-    }
 
     window.onload = () => { if(localStorage.getItem('GAS_URL')) document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL'); focusNfc(); };
     document.body.onclick = (e) => { if (e.target.tagName !== 'INPUT') { isUserTyping = false; focusNfc(); } };
