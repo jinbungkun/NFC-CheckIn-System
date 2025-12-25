@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>출석 관리 시스템</title>
   <style>
     body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
     .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; }
@@ -15,7 +16,7 @@
     .primary { background: #3b82f6; color: white; }
     .success { background: #10b981; color: white; }
     .danger { background: #ef4444; color: white; }
-    .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; }
+    .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -62,12 +63,16 @@
   </div>
 
   <script>
-    const GAS_URL = "-"; // [중요] 여기에 본인 GAS 주소 넣기
+    /**
+     * [보안 적용] 구글 시트 주소를 직접 넣지 않고, 
+     * 클라우드플레어 워커(Proxy) 주소를 여기에 넣습니다.
+     */
+    const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev"; 
+
     let currentTab = 'checkin';
     let selectedStudent = null;
 
     function showPage(p) {
-      // 초기화 로직
       document.querySelectorAll('input').forEach(i => i.value = "");
       document.getElementById('search-res').style.display = 'none';
       document.getElementById('edit-area').style.display = 'none';
@@ -82,6 +87,10 @@
     }
 
     async function initNFC() {
+      if (!('NDEFReader' in window)) {
+        console.log("NFC를 지원하지 않는 브라우저입니다.");
+        return;
+      }
       try {
         const ndef = new NDEFReader();
         await ndef.scan();
@@ -95,18 +104,32 @@
           }
           else if (currentTab === 'add') document.getElementById('add-id').value = tagId;
         };
-      } catch (e) { console.log(e); }
+      } catch (e) { console.log("NFC 인식 에러:", e); }
+    }
+
+    // 공통 요청 함수 (에러 처리를 위해 분리)
+    async function sendRequest(data) {
+      try {
+        const res = await fetch(PROXY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return await res.json();
+      } catch (e) {
+        console.error("통신 에러:", e);
+        alert("서버 통신에 실패했습니다.");
+        return { status: 'error', message: '통신 실패' };
+      }
     }
 
     async function handleCheckin(id) {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'checkin', id: id }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'checkin', id: id });
       alert(data.name + "님: " + data.message);
     }
 
     async function handleSearch(id) {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchId', id: id }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'searchId', id: id });
       if(data.status === 'success') {
         document.getElementById('search-res').style.display = 'block';
         document.getElementById('s-name').innerText = data.name + " 학생";
@@ -115,19 +138,19 @@
     }
 
     async function handleEditSelect(id) {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchId', id: id }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'searchId', id: id });
       if(data.status === 'success') selectUser(data);
     }
 
     async function searchByName() {
       const name = document.getElementById('edit-search-name').value;
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchName', name: name }) });
-      const result = await res.json();
+      const result = await sendRequest({ action: 'searchName', name: name });
       let html = "";
-      result.data.forEach(s => {
-        html += `<div class="card-res" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
-      });
+      if(result.data) {
+        result.data.forEach(s => {
+          html += `<div class="card-res" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
+        });
+      }
       document.getElementById('name-list').innerHTML = html;
     }
 
@@ -141,8 +164,7 @@
 
     async function updatePoint() {
       const amt = document.getElementById('e-amount').value;
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updatePoint', id: selectedStudent.id, amount: amt }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'updatePoint', id: selectedStudent.id, amount: amt });
       alert(data.message);
       showPage('edit');
     }
@@ -150,8 +172,7 @@
     async function replaceCard() {
       const newId = document.getElementById('new-card-id').value;
       if(!newId) return alert("새 카드를 태그하세요.");
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateId', oldId: selectedStudent.id, newId: newId }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'updateId', oldId: selectedStudent.id, newId: newId });
       alert(data.message);
       showPage('edit');
     }
@@ -159,8 +180,7 @@
     async function requestAdd() {
       const id = document.getElementById('add-id').value;
       const name = document.getElementById('add-name').value;
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', id: id, name: name, point: 0 }) });
-      const data = await res.json();
+      const data = await sendRequest({ action: 'add', id: id, name: name, point: 0 });
       alert(data.message);
       showPage('add');
     }
