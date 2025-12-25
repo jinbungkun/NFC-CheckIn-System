@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+    .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; }
+    .nav button { flex: 1; background: transparent; color: #94a3b8; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .nav button.active { background: #3b82f6; color: white; }
+    .page { display: none; background: #1e293b; padding: 20px; border-radius: 16px; }
+    .page.active { display: block; }
+    input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
+    .btn { width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .primary { background: #3b82f6; color: white; }
+    .success { background: #10b981; color: white; }
+    .danger { background: #ef4444; color: white; }
+    .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; }
+  </style>
+</head>
+<body>
+
+  <div class="nav">
+    <button onclick="showPage('checkin')" id="btn-checkin" class="active">출석</button>
+    <button onclick="showPage('search')" id="btn-search">조회</button>
+    <button onclick="showPage('edit')" id="btn-edit">포인트관리</button>
+    <button onclick="showPage('add')" id="btn-add">신규등록</button>
+  </div>
+
+  <div id="page-checkin" class="page active">
+    <div style="text-align:center"><h2>📡 NFC 대기 중</h2><p>카드를 대면 즉시 출석됩니다.</p></div>
+  </div>
+
+  <div id="page-search" class="page">
+    <h2>🔍 빠른 정보 조회</h2><p>조회할 카드를 태그하세요.</p>
+    <div id="search-res" class="card-res" style="display:none">
+      <h3 id="s-name"></h3><p>현재 포인트: <strong id="s-point" style="color:#3b82f6"></strong>점</p>
+    </div>
+  </div>
+
+  <div id="page-edit" class="page">
+    <h2>💰 포인트 및 카드 관리</h2>
+    <div style="display:flex; gap:5px;"><input type="text" id="edit-search-name" placeholder="학생 이름 검색"><button class="btn primary" style="width:80px;" onclick="searchByName()">검색</button></div>
+    <div id="edit-area" class="card-res" style="display:none">
+      <h3 id="e-name"></h3><p>현재 포인트: <strong id="e-current-point"></strong></p>
+      <input type="number" id="e-amount" placeholder="가감할 포인트 (예: 10, -5)">
+      <button class="btn success" onclick="updatePoint()">포인트 적용</button>
+      <div style="margin-top:20px; padding-top:15px; border-top:1px solid #444;">
+        <p style="font-size:0.8rem; color:#94a3b8">💳 카드 분실 시: 새 카드를 태그하고 버튼 클릭</p>
+        <input type="text" id="new-card-id" placeholder="새 카드 ID (태그 시 자동입력)" style="background:#0f172a">
+        <button class="btn danger" onclick="replaceCard()">이 카드로 교체하기</button>
+      </div>
+    </div>
+    <div id="name-list" style="margin-top:10px;"></div>
+  </div>
+
+  <div id="page-add" class="page">
+    <h2>👤 신규 학생 등록</h2>
+    <input type="text" id="add-id" placeholder="카드 태그 시 자동 입력">
+    <input type="text" id="add-name" placeholder="학생 이름">
+    <button class="btn success" onclick="requestAdd()">등록 완료</button>
+  </div>
+
+  <script>
+    const GAS_URL = "-"; // [중요] 여기에 본인 GAS 주소 넣기
+    let currentTab = 'checkin';
+    let selectedStudent = null;
+
+    function showPage(p) {
+      // 초기화 로직
+      document.querySelectorAll('input').forEach(i => i.value = "");
+      document.getElementById('search-res').style.display = 'none';
+      document.getElementById('edit-area').style.display = 'none';
+      document.getElementById('name-list').innerHTML = "";
+      selectedStudent = null;
+      
+      currentTab = p;
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('btn-'+p).classList.add('active');
+    }
+
+    async function initNFC() {
+      try {
+        const ndef = new NDEFReader();
+        await ndef.scan();
+        ndef.onreading = (event) => {
+          let tagId = event.serialNumber;
+          if (currentTab === 'checkin') handleCheckin(tagId);
+          else if (currentTab === 'search') handleSearch(tagId);
+          else if (currentTab === 'edit') {
+            if (selectedStudent) document.getElementById('new-card-id').value = tagId;
+            else handleEditSelect(tagId);
+          }
+          else if (currentTab === 'add') document.getElementById('add-id').value = tagId;
+        };
+      } catch (e) { console.log(e); }
+    }
+
+    async function handleCheckin(id) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'checkin', id: id }) });
+      const data = await res.json();
+      alert(data.name + "님: " + data.message);
+    }
+
+    async function handleSearch(id) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchId', id: id }) });
+      const data = await res.json();
+      if(data.status === 'success') {
+        document.getElementById('search-res').style.display = 'block';
+        document.getElementById('s-name').innerText = data.name + " 학생";
+        document.getElementById('s-point').innerText = data.point;
+      } else alert(data.message);
+    }
+
+    async function handleEditSelect(id) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchId', id: id }) });
+      const data = await res.json();
+      if(data.status === 'success') selectUser(data);
+    }
+
+    async function searchByName() {
+      const name = document.getElementById('edit-search-name').value;
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'searchName', name: name }) });
+      const result = await res.json();
+      let html = "";
+      result.data.forEach(s => {
+        html += `<div class="card-res" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
+      });
+      document.getElementById('name-list').innerHTML = html;
+    }
+
+    function selectUser(student) {
+      selectedStudent = student;
+      document.getElementById('edit-area').style.display = 'block';
+      document.getElementById('e-name').innerText = student.name + " 학생 관리";
+      document.getElementById('e-current-point').innerText = student.point + "점";
+      document.getElementById('name-list').innerHTML = "";
+    }
+
+    async function updatePoint() {
+      const amt = document.getElementById('e-amount').value;
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updatePoint', id: selectedStudent.id, amount: amt }) });
+      const data = await res.json();
+      alert(data.message);
+      showPage('edit');
+    }
+
+    async function replaceCard() {
+      const newId = document.getElementById('new-card-id').value;
+      if(!newId) return alert("새 카드를 태그하세요.");
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateId', oldId: selectedStudent.id, newId: newId }) });
+      const data = await res.json();
+      alert(data.message);
+      showPage('edit');
+    }
+
+    async function requestAdd() {
+      const id = document.getElementById('add-id').value;
+      const name = document.getElementById('add-name').value;
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', id: id, name: name, point: 0 }) });
+      const data = await res.json();
+      alert(data.message);
+      showPage('add');
+    }
+
+    window.onload = initNFC;
+  </script>
+</body>
+</html>
