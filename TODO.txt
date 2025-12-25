@@ -1,5 +1,22 @@
-1.포인트 버튼
-2.검색 출석/전화번호 출석
+1.포인트 버튼/완
+2.검색 출석/전화번호 출석/완
 3.출석표
-4.키오스크처럼 자동구매
-5.
+4.키오스크처럼 자동구매 ->후순위
+5.확장성/로컬에서 구글 스크립트 연결방식으로 변경 배포만 하면 개인별 사용가능/완
+
+
+
+사야할거
+
+샀음
+RFID 리더기 13.56mz HF NFC 호환용 or nfc 리더기
+https://smartstore.naver.com/s-rfid/products/741614620
+NFC 카드(Ntag)
+https://www.coupang.com/vp/products/1396678779?itemId=2432103752&vendorItemId=70426035654&q=nfc215&searchId=c7b74b8318295&sourceType=search&itemsCount=36&searchRank=2&rank=2&traceId=mjl3s5ft
+PD충천 멀티허브
+https://www.coupang.com/vp/products/4881263276?itemId=6355310281&vendorItemId=73650589113&q=pd+%EC%B6%A9%EC%A0%84+%EB%A9%80%ED%8B%B0%ED%97%88%EB%B8%8C&searchId=4b465d31347636&sourceType=search&itemsCount=36&searchRank=3&rank=3&traceId=mjl3u30n
+
+
+안샀음
+샤오신패드 12.7 2025 펜 포함
+
