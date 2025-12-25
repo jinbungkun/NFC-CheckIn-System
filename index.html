@@ -25,6 +25,11 @@
     
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+    /* 입력창과 버튼을 한 줄에 배치하기 위한 스타일 */
+    .input-group { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+    .input-group input { margin: 0; flex: 1; }
+    .input-group .btn-search { width: 70px; height: 48px; margin: 0; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; }
+
     input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; }
     
@@ -45,7 +50,6 @@
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     
-    /* NFC 브릿지 위치 수정 (화면 가리지 않게) */
     #nfc-bridge { position: absolute; left: -9999px; top: 0; }
   </style>
 </head>
@@ -70,26 +74,37 @@
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
       <h2>📡 실시간 출석</h2>
-      <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 4자리" style="text-align:center; font-size:1.8rem;" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); doCheckin();}">
-      <button class="btn btn-success" onclick="doCheckin()">출석 처리</button>
+      <div class="input-group">
+        <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 4자리" style="text-align:center; font-size:1.8rem;">
+        <button class="btn-search" onclick="doCheckin()">출석</button>
+      </div>
     </div>
   </div>
 
   <div id="page-search" class="page">
     <h2>🔍 정보 조회</h2>
-    <input type="text" id="search-input" placeholder="이름 검색..." onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('search');}">
+    <div class="input-group">
+      <input type="text" id="search-input" placeholder="이름 검색...">
+      <button class="btn-search" onclick="findStudent('search')">검색</button>
+    </div>
     <div id="search-results"></div>
   </div>
 
   <div id="page-point" class="page">
     <h2>💰 포인트 지급</h2>
-    <input type="text" id="point-search-input" placeholder="이름 검색 또는 카드 태그" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('point');}">
+    <div class="input-group">
+      <input type="text" id="point-search-input" placeholder="이름 또는 카드 태그">
+      <button class="btn-search" onclick="findStudent('point')">찾기</button>
+    </div>
     <div id="point-target-area"></div>
   </div>
 
   <div id="page-card" class="page">
     <h2>💳 카드 교체</h2>
-    <input type="text" id="card-search-input" placeholder="교체할 학생 이름 검색" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('card');}">
+    <div class="input-group">
+      <input type="text" id="card-search-input" placeholder="학생 이름 검색">
+      <button class="btn-search" onclick="findStudent('card')">검색</button>
+    </div>
     <div id="card-target-area"></div>
   </div>
 
@@ -157,7 +172,6 @@
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       const activeBtn = document.getElementById('nav-' + p);
       if(activeBtn) activeBtn.classList.add('active');
-
       isUserTyping = false;
       window.scrollTo(0,0);
       focusNfc();
@@ -165,7 +179,7 @@
 
     function focusNfc() {
       if (!isUserTyping && document.activeElement.tagName !== 'INPUT') {
-        nfcBridge.focus({ preventScroll: true }); // 스크롤 튐 방지
+        nfcBridge.focus({ preventScroll: true });
         if(!isAdmin) {
           statusBadge.innerText = "● 리더기 모드";
           statusBadge.style.background = "#064e3b";
@@ -173,9 +187,20 @@
       }
     }
 
-    document.querySelectorAll('input:not(#nfc-bridge)').forEach(el => {
+    // 모든 input 요소에 대해 키보드 '엔터' 처리 추가 (버튼 클릭과 동일 효과)
+    document.querySelectorAll('input').forEach(el => {
       el.addEventListener('focus', () => { isUserTyping = true; });
       el.addEventListener('blur', () => { isUserTyping = false; setTimeout(focusNfc, 600); });
+      el.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') {
+          e.target.blur(); 
+          const activePage = document.querySelector('.page.active').id;
+          if(activePage === 'page-checkin') doCheckin();
+          else if(activePage === 'page-search') findStudent('search');
+          else if(activePage === 'page-point') findStudent('point');
+          else if(activePage === 'page-card') findStudent('card');
+        }
+      });
     });
 
     nfcBridge.addEventListener('keydown', (e) => {
@@ -214,14 +239,12 @@
           res.data.forEach(s => {
             const div = document.createElement('div');
             div.className = 'student-info-card';
-            div.style.cursor = 'pointer';
             div.innerHTML = `<div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div>
                              <div style="font-size:0.85rem; color:var(--muted)">ID: ${s.id}</div>`;
             div.onclick = () => renderActionArea(s, pageType);
             container.appendChild(div);
           });
         }
-        // 결과 출력 후 모바일에서 결과창으로 스크롤 이동
         setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
       } else { alert("검색 결과가 없습니다."); }
     }
