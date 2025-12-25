@@ -25,7 +25,6 @@
     
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* 입력창과 버튼을 한 줄에 배치하기 위한 스타일 */
     .input-group { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
     .input-group input { margin: 0; flex: 1; }
     .input-group .btn-search { width: 70px; height: 48px; margin: 0; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; }
@@ -130,6 +129,7 @@
   <script>
     let isAdmin = false;
     let isUserTyping = false;
+    let isApiLoading = false; // [추가] API 통신 중 포커스 방지
     const nfcBridge = document.getElementById('nfc-bridge');
     const statusBadge = document.getElementById('mode-status');
 
@@ -172,28 +172,34 @@
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       const activeBtn = document.getElementById('nav-' + p);
       if(activeBtn) activeBtn.classList.add('active');
+      
       isUserTyping = false;
+      isApiLoading = false;
       window.scrollTo(0,0);
       focusNfc();
     }
 
     function focusNfc() {
-      if (!isUserTyping && document.activeElement.tagName !== 'INPUT') {
-        nfcBridge.focus({ preventScroll: true });
-        if(!isAdmin) {
-          statusBadge.innerText = "● 리더기 모드";
-          statusBadge.style.background = "#064e3b";
-        }
+      // 타이핑 중이거나 API 통신 중이면 포커스 가로채지 않음 (키보드 튐 방지 핵심)
+      if (isUserTyping || isApiLoading || document.activeElement.tagName === 'INPUT') return;
+      
+      nfcBridge.focus({ preventScroll: true });
+      if(!isAdmin) {
+        statusBadge.innerText = "● 리더기 모드";
+        statusBadge.style.background = "#064e3b";
       }
     }
 
-    // 모든 input 요소에 대해 키보드 '엔터' 처리 추가 (버튼 클릭과 동일 효과)
     document.querySelectorAll('input').forEach(el => {
       el.addEventListener('focus', () => { isUserTyping = true; });
-      el.addEventListener('blur', () => { isUserTyping = false; setTimeout(focusNfc, 600); });
+      el.addEventListener('blur', () => { 
+        isUserTyping = false; 
+        // 포커스 복구 지연 시간을 늘려 모바일 키보드 정리 시간 확보
+        setTimeout(focusNfc, 800); 
+      });
       el.addEventListener('keypress', (e) => {
         if(e.key === 'Enter') {
-          e.target.blur(); 
+          e.target.blur(); // 키보드 닫기
           const activePage = document.querySelector('.page.active').id;
           if(activePage === 'page-checkin') doCheckin();
           else if(activePage === 'page-search') findStudent('search');
@@ -226,9 +232,14 @@
     }
 
     async function findStudent(pageType) {
+      // 버튼 클릭 시 즉시 포커스 해제하여 키보드 내림
+      document.activeElement.blur();
+      isUserTyping = false;
+
       const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
       const name = document.getElementById(inputId).value.trim();
       if(!name) return;
+
       const res = await callApi({ action: 'searchName', name: name });
       const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
@@ -245,7 +256,7 @@
             container.appendChild(div);
           });
         }
-        setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+        setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
       } else { alert("검색 결과가 없습니다."); }
     }
 
@@ -271,7 +282,7 @@
       } else if(type === 'search') {
         container.innerHTML = `<div class="student-info-card"><div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div><div style="font-size:0.9rem; color:var(--muted)">ID: ${s.id} | 연락처: ${s.phone || '미등록'}</div></div>`;
       }
-      setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+      setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
 
     async function updatePt(id, amt) {
@@ -297,15 +308,23 @@
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
       if(!url) { showPage('settings'); return null; }
+      
+      isApiLoading = true; // [중요] API 시작 시 포커스 이동 차단
       document.getElementById('loader').style.display = 'flex';
+      
       try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         return await res.json();
       } catch (e) { alert("연결 실패"); return null; }
-      finally { document.getElementById('loader').style.display = 'none'; }
+      finally { 
+        document.getElementById('loader').style.display = 'none';
+        isApiLoading = false; // API 종료
+        setTimeout(focusNfc, 1000); // 넉넉하게 시간을 두고 리더기 모드로 복구
+      }
     }
 
     async function doCheckin() {
+      document.activeElement.blur(); // 키보드 닫기
       const val = document.getElementById('manual-id').value;
       if(!val) return;
       const res = await callApi({ action: 'checkin', id: val });
