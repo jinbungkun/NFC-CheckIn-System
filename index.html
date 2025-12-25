@@ -8,35 +8,29 @@
     :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
     
-    /* 헤더 및 상태표시 */
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px; }
-    .status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; display: inline-block; margin-right: 5px; }
+    /* 상태 표시 배지 추가 */
+    #mode-status { font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; background: #064e3b; color: #34d399; }
     .settings-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; }
 
-    /* 네비게이션 */
-    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
     .nav::-webkit-scrollbar { display: none; }
-    .nav button { flex: none; width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.2s; }
+    .nav button { flex: none; width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
     .nav button.active { background: var(--primary); color: white; }
 
-    /* 페이지 레이아웃 */
     .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     .page.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* 입력창 및 버튼 */
     input { width: 100%; padding: 16px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; }
     .btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-success { background: var(--success); color: white; }
     
-    /* 결과 카드 */
     .res-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid var(--primary); }
     .list-item { padding: 15px; border-bottom: 1px solid #334155; cursor: pointer; }
-    .list-item:last-child { border: none; }
 
-    /* 로딩 애니메이션 */
     #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -44,10 +38,10 @@
 </head>
 <body>
 
-  <div id="loader"><div class="spinner"></div><p style="margin-top:15px">처리 중...</p></div>
+  <div id="loader"><div class="spinner"></div><p style="margin-top:15px; color:white;">처리 중...</p></div>
 
   <div class="header">
-    <div style="font-size: 0.9rem;"><span class="status-dot"></span><span id="conn-status">연결됨</span></div>
+    <div><span id="mode-status">● 리더기 모드</span></div>
     <button class="settings-btn" onclick="showPage('settings')">⚙️</button>
   </div>
 
@@ -61,8 +55,7 @@
 
   <div id="page-settings" class="page">
     <h2>⚙️ 시스템 설정</h2>
-    <p style="color:var(--muted); font-size:0.9rem;">구글 앱 스크립트 배포 URL을 입력해주세요.</p>
-    <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec">
+    <input type="text" id="cfg-url" placeholder="구글 앱 스크립트 배포 URL">
     <button class="btn btn-primary" onclick="saveSettings()">설정 저장 및 연결</button>
   </div>
 
@@ -70,7 +63,7 @@
     <div style="text-align:center">
       <h2>📡 출석 체크</h2>
       <p style="color:var(--muted)">카드 태그 또는 번호 4자리 입력</p>
-      <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 뒤 4자리" style="text-align:center; font-size:1.8rem; letter-spacing: 5px;">
+      <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 뒤 4자리" style="text-align:center; font-size:1.8rem;">
       <button class="btn btn-success" onclick="doCheckin()">출석하기</button>
     </div>
   </div>
@@ -119,9 +112,11 @@
 
   <script>
     let selectedStudent = null;
+    let isUserTyping = false; // 타이핑 상태 감지 변수
     const nfcBridge = document.getElementById('nfc-bridge');
+    const statusBadge = document.getElementById('mode-status');
 
-    // 1. 설정 관리
+    // 1. 설정 및 API 관리
     function saveSettings() {
       const url = document.getElementById('cfg-url').value.trim();
       if(!url.includes('script.google.com')) return alert("유효한 URL이 아닙니다.");
@@ -133,21 +128,71 @@
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
       if(!url) { showPage('settings'); return null; }
-      
       document.getElementById('loader').style.display = 'flex';
       try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
-        const result = await res.json();
-        return result;
+        return await res.json();
       } catch (e) {
-        alert("통신 오류! 설정 URL을 확인하세요.");
+        alert("통신 오류! URL을 확인하세요.");
         return null;
       } finally {
         document.getElementById('loader').style.display = 'none';
       }
     }
 
-    // 2. 주요 기능 로직
+    // 2. 포커스 제어 로직 (추가된 부분)
+    function focusNfc() {
+      if (!isUserTyping && document.activeElement.tagName !== 'INPUT') {
+        nfcBridge.focus();
+        statusBadge.innerText = "● 리더기 모드";
+        statusBadge.style.background = "#064e3b";
+      }
+    }
+
+    // 모든 일반 입력창에 포커스 감지 이벤트 연결
+    document.querySelectorAll('input:not(#nfc-bridge)').forEach(el => {
+      el.addEventListener('focus', () => {
+        isUserTyping = true;
+        statusBadge.innerText = "⌨ 입력 모드";
+        statusBadge.style.background = "#1e293b";
+      });
+      el.addEventListener('blur', () => {
+        isUserTyping = false;
+        setTimeout(focusNfc, 300); // 약간의 지연 후 리더기로 복구
+      });
+    });
+
+    // 3. 테스트 코드 (F1 키 추가)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        const virtualId = "TEST-" + Math.floor(Math.random() * 9000 + 1000);
+        processInput(virtualId);
+      }
+    });
+
+    // 4. 리더기 입력 처리
+    nfcBridge.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') {
+        const val = nfcBridge.value.trim();
+        if(val) processInput(val);
+        nfcBridge.value = "";
+      }
+    });
+
+    function processInput(val) {
+      const activePage = document.querySelector('.page.active').id;
+      if(activePage === 'page-checkin') {
+        document.getElementById('manual-id').value = val;
+        doCheckin();
+      } else if(activePage === 'page-add') {
+        document.getElementById('add-id').value = val;
+      } else if(activePage === 'page-card') {
+        document.getElementById('new-card-id').value = val;
+      }
+    }
+
+    // 5. 기능 함수 (조회, 등록 등 기존 유지)
     async function doCheckin() {
       const id = document.getElementById('manual-id').value;
       if(!id) return;
@@ -168,7 +213,7 @@
           div.innerHTML = `<strong>${s.name}</strong><br><small>${s.phone || '번호없음'}</small> | ${s.point}pt`;
           div.onclick = () => {
             selectedStudent = s;
-            alert(`${s.name} 학생이 선택되었습니다. 포인트/교체 메뉴를 이용하세요.`);
+            alert(`${s.name} 학생 선택됨`);
             prepManagement(s);
           };
           container.appendChild(div);
@@ -180,7 +225,6 @@
       document.getElementById('edit-selection').style.display = 'block';
       document.getElementById('edit-target-name').innerText = s.name;
       document.getElementById('edit-msg').style.display = 'none';
-      
       document.getElementById('card-selection').style.display = 'block';
       document.getElementById('card-target-name').innerText = s.name;
       document.getElementById('card-msg').style.display = 'none';
@@ -198,48 +242,24 @@
     }
 
     async function registerStudent() {
-      const data = {
+      const res = await callApi({
         action: 'add',
         id: document.getElementById('add-id').value,
         name: document.getElementById('add-name').value,
         phone: document.getElementById('add-phone').value,
         point: 0
-      };
-      const res = await callApi(data);
+      });
       if(res) { alert(res.message); showPage('checkin'); }
     }
 
-    // 3. UI 제어 및 리더기 포커스
     function showPage(p) {
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       document.getElementById('page-' + p).classList.add('active');
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
-      const navBtn = document.getElementById('nav-' + p);
-      if(navBtn) navBtn.classList.add('active');
-      
+      document.getElementById('nav-' + p).classList.add('active');
+      isUserTyping = false;
       if(p !== 'settings') focusNfc();
     }
-
-    function focusNfc() {
-      nfcBridge.focus();
-    }
-
-    nfcBridge.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') {
-        const val = nfcBridge.value.trim();
-        if(!val) return;
-        const activePage = document.querySelector('.page.active').id;
-        if(activePage === 'page-checkin') {
-          document.getElementById('manual-id').value = val;
-          doCheckin();
-        } else if(activePage === 'page-add') {
-          document.getElementById('add-id').value = val;
-        } else if(activePage === 'page-card') {
-          document.getElementById('new-card-id').value = val;
-        }
-        nfcBridge.value = "";
-      }
-    });
 
     window.onload = () => {
       const savedUrl = localStorage.getItem('GAS_URL');
@@ -249,7 +269,13 @@
         focusNfc();
       }
     };
-    document.body.onclick = focusNfc;
+
+    document.body.onclick = (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        isUserTyping = false;
+        focusNfc();
+      }
+    };
   </script>
 </body>
 </html>
