@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>출석 관리 시스템 (리더기 모드)</title>
+  <title>출석 관리 시스템 (로딩 보호 모드)</title>
   <style>
     body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
     .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; }
@@ -18,11 +18,38 @@
     .danger { background: #ef4444; color: white; }
     .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; cursor: pointer; }
     .status-badge { text-align: center; padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 0.9rem; background: #064e3b; color: #34d399; }
+
+    /* 로딩창 스타일 */
+    #loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      z-index: 10000;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .spinner {
+      width: 50px; height: 50px;
+      border: 5px solid #334155;
+      border-top: 5px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <div class="status-badge">● 리더기 연결 대기 중 (화면을 클릭하세요)</div>
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text" style="font-weight:bold; color:white;">처리 중입니다...</div>
+  </div>
+
+  <div class="status-badge">● 리더기 연결 대기 중 (화면 클릭 필요)</div>
 
   <div class="nav">
     <button onclick="showPage('checkin')" id="btn-checkin" class="active">출석</button>
@@ -71,14 +98,23 @@
     const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev"; 
     let currentTab = 'checkin';
     let selectedStudent = null;
+    let isLoading = false; // 로딩 상태 변수
     const hiddenInput = document.getElementById('hidden-nfc-input');
+    const loadingOverlay = document.getElementById('loading-overlay');
 
-    document.addEventListener('click', () => hiddenInput.focus());
+    // 로딩 제어 함수
+    function setLoader(show, text = "처리 중입니다...") {
+      isLoading = show;
+      loadingOverlay.style.display = show ? 'flex' : 'none';
+      document.getElementById('loading-text').innerText = text;
+    }
+
+    document.addEventListener('click', () => { if(!isLoading) hiddenInput.focus(); });
 
     window.onload = () => {
         hiddenInput.focus();
-        // F1 키 테스트 기능 활성화
         window.addEventListener('keydown', (e) => {
+            if (isLoading) return; // 로딩 중에는 키보드 무시
             if (e.key === 'F1') {
                 e.preventDefault();
                 const virtualId = "TEST-" + Math.floor(Math.random() * 9000 + 1000);
@@ -89,6 +125,7 @@
 
     hiddenInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        if (isLoading) return; // 중복 요청 방지
         const tagId = hiddenInput.value.trim();
         if (tagId) handleTagInput(tagId);
         hiddenInput.value = ""; 
@@ -109,6 +146,7 @@
     }
 
     function showPage(p) {
+      if (isLoading) return;
       document.querySelectorAll('input').forEach(i => i.value = "");
       document.getElementById('search-res').style.display = 'none';
       document.getElementById('edit-area').style.display = 'none';
@@ -123,23 +161,26 @@
     }
 
     async function sendRequest(data) {
+      setLoader(true); // 요청 시작 시 로딩창 표시
       try {
         const res = await fetch(PROXY_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-        const text = await res.text();
-        return JSON.parse(text);
+        const result = await res.json();
+        setLoader(false); // 성공 시 로딩창 숨김
+        return result;
       } catch (e) {
-        alert("통신 실패! 서버 설정을 확인하세요.");
+        setLoader(false); // 실패 시 로딩창 숨김
+        alert("통신 실패!");
         return { status: 'error' };
       }
     }
 
     async function handleCheckin(id) {
       const data = await sendRequest({ action: 'checkin', id: id });
-      alert(data.name + "님: " + data.message);
+      if(data.status !== 'error') alert(data.name + "님: " + data.message);
     }
 
     async function handleSearch(id) {
@@ -153,6 +194,7 @@
 
     async function searchByName() {
       const name = document.getElementById('edit-search-name').value;
+      if(!name) return;
       const result = await sendRequest({ action: 'searchName', name: name });
       let html = "";
       if(result.data) {
@@ -172,6 +214,7 @@
 
     async function updatePoint() {
       const amt = document.getElementById('e-amount').value;
+      if(!amt) return alert("숫자를 입력하세요.");
       const data = await sendRequest({ action: 'updatePoint', id: selectedStudent.id, amount: amt });
       alert(data.message);
       showPage('edit');
