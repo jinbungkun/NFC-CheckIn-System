@@ -18,10 +18,8 @@
     .nav button { flex: none; width: 75px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
     .nav button.active { background: var(--primary); color: white; }
     
-    /* 관리자 버튼 숨김용 클래스 */
     .admin-only-btn { display: none; } 
 
-    /* 페이지 스타일 - display:none이 기본이며 active가 붙어야만 보임 */
     .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     .page.active { display: block !important; animation: fadeIn 0.3s ease; }
     
@@ -46,6 +44,9 @@
     #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* NFC 브릿지 위치 수정 (화면 가리지 않게) */
+    #nfc-bridge { position: absolute; left: -9999px; top: 0; }
   </style>
 </head>
 <body>
@@ -69,26 +70,26 @@
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
       <h2>📡 실시간 출석</h2>
-      <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 4자리" style="text-align:center; font-size:1.8rem;">
+      <input type="tel" id="manual-id" inputmode="numeric" placeholder="번호 4자리" style="text-align:center; font-size:1.8rem;" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); doCheckin();}">
       <button class="btn btn-success" onclick="doCheckin()">출석 처리</button>
     </div>
   </div>
 
   <div id="page-search" class="page">
     <h2>🔍 정보 조회</h2>
-    <input type="text" id="search-input" placeholder="이름 검색..." onkeydown="if(event.key==='Enter') findStudent('search')">
+    <input type="text" id="search-input" placeholder="이름 검색..." onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('search');}">
     <div id="search-results"></div>
   </div>
 
   <div id="page-point" class="page">
     <h2>💰 포인트 지급</h2>
-    <input type="text" id="point-search-input" placeholder="이름 검색 또는 카드 태그" onkeydown="if(event.key==='Enter') findStudent('point')">
+    <input type="text" id="point-search-input" placeholder="이름 검색 또는 카드 태그" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('point');}">
     <div id="point-target-area"></div>
   </div>
 
   <div id="page-card" class="page">
     <h2>💳 카드 교체</h2>
-    <input type="text" id="card-search-input" placeholder="교체할 학생 이름 검색" onkeydown="if(event.key==='Enter') findStudent('card')">
+    <input type="text" id="card-search-input" placeholder="교체할 학생 이름 검색" onkeypress="if(event.key==='Enter'){event.preventDefault(); this.blur(); findStudent('card');}">
     <div id="card-target-area"></div>
   </div>
 
@@ -109,7 +110,7 @@
     <button class="btn btn-primary" onclick="saveSettings()">설정 저장</button>
   </div>
 
-  <input type="text" id="nfc-bridge" style="position:fixed; bottom:-100px;">
+  <input type="text" id="nfc-bridge">
 
   <script>
     let isAdmin = false;
@@ -117,11 +118,9 @@
     const nfcBridge = document.getElementById('nfc-bridge');
     const statusBadge = document.getElementById('mode-status');
 
-    // [핵심] 관리자 상태 변경 및 저장 함수
     function setAdminState(state) {
       isAdmin = state;
       localStorage.setItem('IS_ADMIN_ACTIVE', state ? "true" : "false");
-      
       if (isAdmin) {
         document.querySelectorAll('.admin-only-btn').forEach(el => el.style.display = 'block');
         statusBadge.innerText = "● 관리자 모드";
@@ -132,7 +131,7 @@
         statusBadge.innerText = "● 학생 모드";
         statusBadge.classList.remove('admin-active');
         document.querySelector('.admin-lock-btn').innerText = "🔒";
-        showPage('checkin'); // 학생모드 전환 시 출석으로 이동
+        showPage('checkin');
       }
     }
 
@@ -140,49 +139,33 @@
       if (!isAdmin) {
         const pw = prompt("관리자 비밀번호를 입력하세요.");
         const savedPw = localStorage.getItem('ADMIN_PW') || "0000";
-        if (pw === savedPw) {
-          setAdminState(true);
-          alert("관리자 인증 성공");
-        } else {
-          alert("비밀번호가 올바르지 않습니다.");
-        }
-      } else {
-        setAdminState(false);
-        alert("관리자 모드 종료");
-      }
+        if (pw === savedPw) { setAdminState(true); alert("관리자 인증 성공"); }
+        else { alert("비밀번호가 올바르지 않습니다."); }
+      } else { setAdminState(false); alert("관리자 모드 종료"); }
     }
 
-    // [버그수정] 페이지 전환 시 active 클래스만 제어하도록 수정
     function showPage(p) {
       if(!isAdmin && p !== 'checkin') return;
-
-      // 1. 모든 인풋 초기화 (설정값 제외)
       document.querySelectorAll('input').forEach(input => {
         if(input.id !== 'cfg-url' && input.id !== 'cfg-pw') input.value = ""; 
       });
-
-      // 2. 결과창 초기화
       const containers = ['search-results', 'point-target-area', 'card-target-area'];
       containers.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ""; });
-
-      // 3. 페이지 노출 제어 (모든 페이지 active 제거 후 타겟만 추가)
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       const targetPage = document.getElementById('page-' + p);
       if(targetPage) targetPage.classList.add('active');
-      
-      // 4. 네비 버튼 활성화
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       const activeBtn = document.getElementById('nav-' + p);
       if(activeBtn) activeBtn.classList.add('active');
 
       isUserTyping = false;
+      window.scrollTo(0,0);
       focusNfc();
     }
 
-    // NFC 및 입력 포커스 로직
     function focusNfc() {
       if (!isUserTyping && document.activeElement.tagName !== 'INPUT') {
-        nfcBridge.focus();
+        nfcBridge.focus({ preventScroll: true }); // 스크롤 튐 방지
         if(!isAdmin) {
           statusBadge.innerText = "● 리더기 모드";
           statusBadge.style.background = "#064e3b";
@@ -192,7 +175,7 @@
 
     document.querySelectorAll('input:not(#nfc-bridge)').forEach(el => {
       el.addEventListener('focus', () => { isUserTyping = true; });
-      el.addEventListener('blur', () => { isUserTyping = false; setTimeout(focusNfc, 300); });
+      el.addEventListener('blur', () => { isUserTyping = false; setTimeout(focusNfc, 600); });
     });
 
     nfcBridge.addEventListener('keydown', (e) => {
@@ -217,7 +200,6 @@
       }
     }
 
-    // API 및 데이터 처리 함수들
     async function findStudent(pageType) {
       const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
       const name = document.getElementById(inputId).value.trim();
@@ -226,7 +208,7 @@
       const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
       container.innerHTML = "";
-      if(res && res.data) {
+      if(res && res.data && res.data.length > 0) {
         if(res.data.length === 1) renderActionArea(res.data[0], pageType);
         else {
           res.data.forEach(s => {
@@ -239,6 +221,8 @@
             container.appendChild(div);
           });
         }
+        // 결과 출력 후 모바일에서 결과창으로 스크롤 이동
+        setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
       } else { alert("검색 결과가 없습니다."); }
     }
 
@@ -264,6 +248,7 @@
       } else if(type === 'search') {
         container.innerHTML = `<div class="student-info-card"><div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div><div style="font-size:0.9rem; color:var(--muted)">ID: ${s.id} | 연락처: ${s.phone || '미등록'}</div></div>`;
       }
+      setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
     }
 
     async function updatePt(id, amt) {
@@ -298,7 +283,9 @@
     }
 
     async function doCheckin() {
-      const res = await callApi({ action: 'checkin', id: document.getElementById('manual-id').value });
+      const val = document.getElementById('manual-id').value;
+      if(!val) return;
+      const res = await callApi({ action: 'checkin', id: val });
       if(res) alert(`${res.name}: ${res.message}`);
       document.getElementById('manual-id').value = "";
     }
@@ -319,15 +306,11 @@
     window.onload = () => {
       const url = localStorage.getItem('GAS_URL');
       if(url) document.getElementById('cfg-url').value = url;
-      
-      // 관리자 로그인 상태 복구
-      const savedAdminStatus = localStorage.getItem('IS_ADMIN_ACTIVE') === "true";
-      setAdminState(savedAdminStatus);
-      
+      setAdminState(localStorage.getItem('IS_ADMIN_ACTIVE') === "true");
       focusNfc();
     };
     
-    document.body.onclick = (e) => { if (e.target.tagName !== 'INPUT') { isUserTyping = false; focusNfc(); } };
+    document.body.onclick = (e) => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { isUserTyping = false; focusNfc(); } };
   </script>
 </body>
 </html>
