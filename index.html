@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>출석 관리 시스템 (리더기 모드)</title>
+  <title>출석 관리 시스템 (리더기 최적화)</title>
   <style>
-    /* 기존 스타일 유지 */
     body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
     .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; }
     .nav button { flex: 1; background: transparent; color: #94a3b8; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
@@ -17,104 +16,106 @@
     .primary { background: #3b82f6; color: white; }
     .success { background: #10b981; color: white; }
     .danger { background: #ef4444; color: white; }
-    .status-badge { text-align: center; padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 0.9rem; }
-    .online { background: #064e3b; color: #34d399; }
+    .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; cursor: pointer; }
+    .status-badge { text-align: center; padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 0.9rem; background: #064e3b; color: #34d399; }
   </style>
 </head>
 <body>
 
-  <div class="status-badge online">● 리더기 연결 대기 중 (화면을 클릭하세요)</div>
+  <div class="status-badge">● 리더기 연결 대기 중 (화면을 클릭하세요)</div>
 
   <div class="nav">
     <button onclick="showPage('checkin')" id="btn-checkin" class="active">출석</button>
     <button onclick="showPage('search')" id="btn-search">조회</button>
-    <button onclick="showPage('edit')" id="btn-edit">관리</button>
-    <button onclick="showPage('add')" id="btn-add">등록</button>
+    <button onclick="showPage('edit')" id="btn-edit">포인트관리</button>
+    <button onclick="showPage('add')" id="btn-add">신규등록</button>
   </div>
 
   <input type="text" id="hidden-nfc-input" style="position: absolute; opacity: 0; pointer-events: none;">
 
   <div id="page-checkin" class="page active">
-    <div style="text-align:center">
-      <h2>📡 리더기에 카드를 대주세요</h2>
-      <p style="color: #94a3b8;">출석 전용 모드입니다.</p>
-    </div>
+    <div style="text-align:center"><h2>📡 리더기 대기 중</h2><p>카드를 태그하면 즉시 출석됩니다.</p></div>
   </div>
 
   <div id="page-search" class="page">
     <h2>🔍 빠른 정보 조회</h2><p>카드를 태그하세요.</p>
-    <div id="search-res" style="display:none; background:#334155; padding:15px; border-radius:12px;">
+    <div id="search-res" class="card-res" style="display:none">
       <h3 id="s-name"></h3><p>현재 포인트: <strong id="s-point" style="color:#3b82f6"></strong>점</p>
     </div>
   </div>
 
   <div id="page-edit" class="page">
-    <h2>💰 포인트 관리</h2>
-    <input type="text" id="edit-search-name" placeholder="이름 검색"><button class="btn primary" onclick="searchByName()">검색</button>
-    <div id="edit-area" style="display:none; margin-top:15px;">
-      <h3 id="e-name"></h3><p>현재: <span id="e-current-point"></span>점</p>
-      <input type="number" id="e-amount" placeholder="가감할 포인트">
-      <button class="btn success" onclick="updatePoint()">반영</button>
+    <h2>💰 포인트 및 카드 관리</h2>
+    <div style="display:flex; gap:5px;"><input type="text" id="edit-search-name" placeholder="학생 이름 검색"><button class="btn primary" style="width:80px;" onclick="searchByName()">검색</button></div>
+    <div id="edit-area" class="card-res" style="display:none">
+      <h3 id="e-name"></h3><p>현재 포인트: <strong id="e-current-point"></strong></p>
+      <input type="number" id="e-amount" placeholder="가감할 포인트 (예: 10, -5)">
+      <button class="btn success" onclick="updatePoint()">포인트 적용</button>
+      <div style="margin-top:20px; padding-top:15px; border-top:1px solid #444;">
+        <p style="font-size:0.8rem; color:#94a3b8">💳 카드 분실 시: 새 카드를 태그하고 버튼 클릭</p>
+        <input type="text" id="new-card-id" placeholder="새 카드 ID (태그 시 자동입력)">
+        <button class="btn danger" onclick="replaceCard()">이 카드로 교체하기</button>
+      </div>
     </div>
+    <div id="name-list" style="margin-top:10px;"></div>
   </div>
 
   <div id="page-add" class="page">
     <h2>👤 신규 학생 등록</h2>
-    <input type="text" id="add-id" placeholder="카드 ID (태그 시 입력됨)">
-    <input type="text" id="add-name" placeholder="학생 이름">
+    <input type="text" id="add-id" placeholder="카드를 태그하세요 (ID 자동입력)">
+    <input type="text" id="add-name" placeholder="학생 이름 입력">
     <button class="btn success" onclick="requestAdd()">등록 완료</button>
   </div>
 
   <script>
-    const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev";
+    const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev"; 
     let currentTab = 'checkin';
+    let selectedStudent = null;
     const hiddenInput = document.getElementById('hidden-nfc-input');
 
-    // 1. 포커스 유지 (리더기 입력 낚아채기 핵심)
+    // 리더기 포커스 유지 로직
     document.addEventListener('click', () => hiddenInput.focus());
-    window.onload = () => hiddenInput.focus();
+    window.onload = () => {
+        hiddenInput.focus();
+        // 테스트용 버튼 생성
+        createTestButton();
+    };
 
-    // 2. 리더기 입력 감지 (엔터 키가 들어오면 전송)
+    // 리더기(HID 키보드) 입력 처리
     hiddenInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const tagId = hiddenInput.value.trim();
         if (tagId) handleTagInput(tagId);
-        hiddenInput.value = ""; // 입력창 비우기
+        hiddenInput.value = ""; 
       }
     });
 
     function handleTagInput(tagId) {
-  if (currentTab === 'checkin') {
-    // 1. 출석 탭: 카드를 찍자마자 즉시 출석 처리 (완전 자동)
-    handleCheckin(tagId);
-  } 
-  else if (currentTab === 'search') {
-    // 2. 조회 탭: 카드를 찍자마자 즉시 정보 조회 (완전 자동)
-    handleSearch(tagId);
-  } 
-  else if (currentTab === 'add') {
-    // 3. 등록 탭: 카드 ID 칸에 값만 입력하고 대기 (수동 확인 필요)
-    document.getElementById('add-id').value = tagId;
-    // 이름 입력 칸으로 커서를 옮겨주면 더 편합니다.
-    document.getElementById('add-name').focus(); 
-  }
-  else if (currentTab === 'edit') {
-    // 4. 관리 탭: 카드 교체 시 새 ID 칸에 입력
-    if (selectedStudent) {
-      document.getElementById('new-card-id').value = tagId;
-    } else {
-      handleEditSelect(tagId); // 학생 선택 전이라면 해당 카드로 학생 검색
+      if (currentTab === 'checkin') handleCheckin(tagId);
+      else if (currentTab === 'search') handleSearch(tagId);
+      else if (currentTab === 'add') {
+          document.getElementById('add-id').value = tagId;
+          document.getElementById('add-name').focus(); // ID 찍으면 이름 칸으로 이동
+      }
+      else if (currentTab === 'edit') {
+        if (selectedStudent) document.getElementById('new-card-id').value = tagId;
+        else handleEditSelect(tagId);
+      }
     }
-  }
-}
 
     function showPage(p) {
+      document.querySelectorAll('input').forEach(i => i.value = "");
+      document.getElementById('search-res').style.display = 'none';
+      document.getElementById('edit-area').style.display = 'none';
+      document.getElementById('name-list').innerHTML = "";
+      selectedStudent = null;
+      
       currentTab = p;
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.getElementById('page-'+p).classList.add('active');
       document.getElementById('btn-'+p).classList.add('active');
-      hiddenInput.focus(); // 탭 이동 후에도 리더기 대기
+      hiddenInput.focus();
     }
 
     async function sendRequest(data) {
@@ -124,36 +125,76 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-        return await res.json();
+        const text = await res.text();
+        return JSON.parse(text);
       } catch (e) {
-        alert("통신 실패");
+        console.error("통신 에러:", e);
+        alert("통신 실패! 주소나 권한을 확인하세요.");
         return { status: 'error' };
       }
     }
 
     async function handleCheckin(id) {
       const data = await sendRequest({ action: 'checkin', id: id });
-      alert(data.name + ": " + data.message);
+      alert(data.name + "님: " + data.message);
     }
 
     async function handleSearch(id) {
       const data = await sendRequest({ action: 'searchId', id: id });
       if(data.status === 'success') {
         document.getElementById('search-res').style.display = 'block';
-        document.getElementById('s-name').innerText = data.name;
+        document.getElementById('s-name').innerText = data.name + " 학생";
         document.getElementById('s-point').innerText = data.point;
+      } else alert(data.message);
+    }
+
+    async function searchByName() {
+      const name = document.getElementById('edit-search-name').value;
+      const result = await sendRequest({ action: 'searchName', name: name });
+      let html = "";
+      if(result.data) {
+        result.data.forEach(s => {
+          html += `<div class="card-res" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
+        });
       }
+      document.getElementById('name-list').innerHTML = html;
+    }
+
+    function selectUser(student) {
+      selectedStudent = student;
+      document.getElementById('edit-area').style.display = 'block';
+      document.getElementById('e-name').innerText = student.name + " 학생 관리";
+      document.getElementById('e-current-point').innerText = student.point + "점";
+    }
+
+    async function updatePoint() {
+      const amt = document.getElementById('e-amount').value;
+      const data = await sendRequest({ action: 'updatePoint', id: selectedStudent.id, amount: amt });
+      alert(data.message);
+      showPage('edit');
     }
 
     async function requestAdd() {
       const id = document.getElementById('add-id').value;
       const name = document.getElementById('add-name').value;
+      if(!id || !name) return alert("카드 ID와 이름을 모두 입력하세요.");
       const data = await sendRequest({ action: 'add', id: id, name: name, point: 0 });
       alert(data.message);
       showPage('checkin');
     }
-    
-    // 이름 검색 등 나머지 함수는 이전과 동일
+
+    // --- 테스트용 버튼 생성 함수 ---
+    function createTestButton() {
+        const btn = document.createElement('button');
+        btn.innerText = "🛠️ 가상 카드 태그 테스트";
+        btn.style = "position:fixed; bottom:20px; right:20px; z-index:1000; padding:12px; background:#f59e0b; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);";
+        btn.onclick = () => {
+            const virtualId = "TEST-ID-" + Math.floor(Math.random() * 1000);
+            console.log("가상 태그 읽음:", virtualId);
+            handleTagInput(virtualId);
+        };
+        document.body.appendChild(btn);
+    }
   </script>
 </body>
 </html>
