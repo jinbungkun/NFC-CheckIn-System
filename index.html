@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>출석 관리 시스템 (로딩 보호 모드)</title>
+  <title>출석 관리 시스템 (스마트 포커스 모드)</title>
   <style>
     body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
     .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; }
@@ -49,7 +49,7 @@
     <div id="loading-text" style="font-weight:bold; color:white;">처리 중입니다...</div>
   </div>
 
-  <div class="status-badge">● 리더기 연결 대기 중 (화면 클릭 필요)</div>
+  <div class="status-badge" id="mode-badge">● 리더기 모드 (카드를 태그하세요)</div>
 
   <div class="nav">
     <button onclick="showPage('checkin')" id="btn-checkin" class="active">출석</button>
@@ -98,23 +98,48 @@
     const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev"; 
     let currentTab = 'checkin';
     let selectedStudent = null;
-    let isLoading = false; // 로딩 상태 변수
+    let isLoading = false; 
+    let isUserTyping = false; // 사용자가 입력 중인지 확인하는 변수
+    
     const hiddenInput = document.getElementById('hidden-nfc-input');
     const loadingOverlay = document.getElementById('loading-overlay');
+    const modeBadge = document.getElementById('mode-badge');
 
-    // 로딩 제어 함수
+    // 로딩 제어
     function setLoader(show, text = "처리 중입니다...") {
       isLoading = show;
       loadingOverlay.style.display = show ? 'flex' : 'none';
       document.getElementById('loading-text').innerText = text;
     }
 
-    document.addEventListener('click', () => { if(!isLoading) hiddenInput.focus(); });
+    // 스마트 포커스 로직
+    function focusReader() {
+      if (!isLoading && !isUserTyping) {
+        hiddenInput.focus();
+        modeBadge.innerText = "● 리더기 모드 (카드를 태그하세요)";
+        modeBadge.style.background = "#064e3b";
+      }
+    }
+
+    // 화면 클릭 시 처리
+    document.addEventListener('click', (e) => {
+      // 입력창을 클릭한 것이라면 타이핑 모드로 전환
+      if (e.target.tagName === 'INPUT' && e.target.id !== 'hidden-nfc-input') {
+        isUserTyping = true;
+        modeBadge.innerText = "⌨ 키보드 입력 모드";
+        modeBadge.style.background = "#1e293b";
+      } else {
+        // 배경이나 버튼을 클릭하면 다시 리더기 모드 준비
+        isUserTyping = false;
+        focusReader();
+      }
+    });
 
     window.onload = () => {
-        hiddenInput.focus();
+        focusReader();
+        // F1 테스트 기능
         window.addEventListener('keydown', (e) => {
-            if (isLoading) return; // 로딩 중에는 키보드 무시
+            if (isLoading) return;
             if (e.key === 'F1') {
                 e.preventDefault();
                 const virtualId = "TEST-" + Math.floor(Math.random() * 9000 + 1000);
@@ -123,9 +148,10 @@
         });
     };
 
+    // 리더기 입력 엔터 처리
     hiddenInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        if (isLoading) return; // 중복 요청 방지
+        if (isLoading) return;
         const tagId = hiddenInput.value.trim();
         if (tagId) handleTagInput(tagId);
         hiddenInput.value = ""; 
@@ -138,10 +164,11 @@
       else if (currentTab === 'add') {
           document.getElementById('add-id').value = tagId;
           document.getElementById('add-name').focus();
+          isUserTyping = true; // 이름 입력을 위해 타이핑 모드로 자동 전환
       }
       else if (currentTab === 'edit') {
         if (selectedStudent) document.getElementById('new-card-id').value = tagId;
-        else handleEditSelect(tagId);
+        else handleSearch(tagId); // 관리탭에서도 카드 찍으면 바로 검색되게
       }
     }
 
@@ -157,11 +184,13 @@
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.getElementById('page-'+p).classList.add('active');
       document.getElementById('btn-'+p).classList.add('active');
-      hiddenInput.focus();
+      
+      isUserTyping = false;
+      focusReader();
     }
 
     async function sendRequest(data) {
-      setLoader(true); // 요청 시작 시 로딩창 표시
+      setLoader(true);
       try {
         const res = await fetch(PROXY_URL, {
           method: 'POST',
@@ -169,10 +198,10 @@
           body: JSON.stringify(data)
         });
         const result = await res.json();
-        setLoader(false); // 성공 시 로딩창 숨김
+        setLoader(false);
         return result;
       } catch (e) {
-        setLoader(false); // 실패 시 로딩창 숨김
+        setLoader(false);
         alert("통신 실패!");
         return { status: 'error' };
       }
@@ -186,9 +215,13 @@
     async function handleSearch(id) {
       const data = await sendRequest({ action: 'searchId', id: id });
       if(data.status === 'success') {
-        document.getElementById('search-res').style.display = 'block';
-        document.getElementById('s-name').innerText = data.name + " 학생";
-        document.getElementById('s-point').innerText = data.point;
+        if(currentTab === 'search') {
+            document.getElementById('search-res').style.display = 'block';
+            document.getElementById('s-name').innerText = data.name + " 학생";
+            document.getElementById('s-point').innerText = data.point;
+        } else if(currentTab === 'edit') {
+            selectUser(data);
+        }
       } else alert(data.message);
     }
 
@@ -197,10 +230,12 @@
       if(!name) return;
       const result = await sendRequest({ action: 'searchName', name: name });
       let html = "";
-      if(result.data) {
+      if(result.data && result.data.length > 0) {
         result.data.forEach(s => {
           html += `<div class="card-res" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
         });
+      } else {
+          html = "<p style='text-align:center; color:#94a3b8;'>검색 결과가 없습니다.</p>";
       }
       document.getElementById('name-list').innerHTML = html;
     }
@@ -209,7 +244,8 @@
       selectedStudent = student;
       document.getElementById('edit-area').style.display = 'block';
       document.getElementById('e-name').innerText = student.name + " 학생 관리";
-      document.getElementById('e-current-point').innerText = student.point + "점";
+      document.getElementById('e-current-point').innerText = (student.point || 0) + "점";
+      document.getElementById('name-list').innerHTML = "";
     }
 
     async function updatePoint() {
