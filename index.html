@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>출석 관리 시스템 (포인트 최적화)</title>
+  <title>출석 관리 시스템 (전화번호 출석 통합)</title>
   <style>
     body { font-family: sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
     .nav { display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 8px; border-radius: 12px; overflow-x: auto; }
@@ -19,7 +19,6 @@
     .card-res { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border-left: 5px solid #3b82f6; }
     .status-badge { text-align: center; padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 0.9rem; background: #064e3b; color: #34d399; }
     
-    /* 포인트 버튼 스타일 */
     .point-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
     .pt-btn { padding: 12px; border-radius: 10px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-weight: bold; cursor: pointer; }
     .pt-btn:active { background: #334155; transform: scale(0.98); }
@@ -46,15 +45,31 @@
 
   <input type="text" id="hidden-nfc-input" style="position: absolute; opacity: 0; pointer-events: none;">
 
-  <div id="page-checkin" class="page active"><div style="text-align:center"><h2>📡 리더기 대기 중</h2><p>카드를 태그하면 즉시 출석됩니다.</p></div></div>
-  <div id="page-search" class="page"><h2>🔍 정보 조회</h2><div id="search-res" class="card-res" style="display:none"><h3 id="s-name"></h3><p>포인트: <strong id="s-point"></strong>점</p></div></div>
+  <div id="page-checkin" class="page active">
+    <div style="text-align:center">
+      <h2>📡 출석 체크</h2>
+      <p>카드를 태그하거나 전화번호를 입력하세요.</p>
+      <div style="display:flex; gap:5px; margin-top:20px;">
+        <input type="number" id="manual-phone-input" placeholder="전화번호 뒤 4자리" style="font-size:1.2rem; text-align:center;">
+        <button class="btn success" style="width:100px; margin-top:10px;" onclick="manualCheckin()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-search" class="page">
+    <h2>🔍 정보 조회</h2>
+    <div id="search-res" class="card-res" style="display:none">
+      <h3 id="s-name"></h3>
+      <p>전화번호: <span id="s-phone"></span></p>
+      <p>포인트: <strong id="s-point"></strong>점</p>
+    </div>
+  </div>
 
   <div id="page-edit" class="page">
     <h2>💰 포인트 적립/차감</h2>
     <div style="display:flex; gap:5px;"><input type="text" id="edit-search-name" placeholder="이름 검색"><button class="btn primary" style="width:80px; margin-top:10px;" onclick="searchByName()">검색</button></div>
     <div id="edit-area" class="card-res" style="display:none">
       <h3 id="e-name"></h3><p>현재: <strong id="e-current-point"></strong></p>
-      
       <div class="point-grid">
         <button class="pt-btn pt-plus" onclick="quickPoint(100)">+100</button>
         <button class="pt-btn pt-minus" onclick="quickPoint(-100)">-100</button>
@@ -73,7 +88,7 @@
 
   <div id="page-card" class="page">
     <h2>💳 카드 재등록 (분실)</h2>
-    <p style="color: #94a3b8; font-size: 0.9rem;">학생을 먼저 검색한 후 새 카드를 태그하세요.</p>
+    <p style="color: #94a3b8; font-size: 0.9rem;">학생을 검색한 후 새 카드를 태그하세요.</p>
     <div style="display:flex; gap:5px;"><input type="text" id="card-search-name" placeholder="학생 이름 검색"><button class="btn primary" style="width:80px; margin-top:10px;" onclick="searchByName()">검색</button></div>
     <div id="card-area" class="card-res" style="display:none">
       <h3 id="c-name"></h3>
@@ -83,7 +98,13 @@
     <div id="card-name-list" style="margin-top:10px;"></div>
   </div>
 
-  <div id="page-add" class="page"><h2>👤 신규 등록</h2><input type="text" id="add-id" placeholder="카드 태그"><input type="text" id="add-name" placeholder="학생 이름"><button class="btn success" onclick="requestAdd()">등록 완료</button></div>
+  <div id="page-add" class="page">
+    <h2>👤 신규 등록</h2>
+    <input type="text" id="add-id" placeholder="카드 태그 (ID 자동입력)">
+    <input type="text" id="add-name" placeholder="학생 이름">
+    <input type="tel" id="add-phone" placeholder="전화번호 입력 (01012345678)">
+    <button class="btn success" onclick="requestAdd()">등록 완료</button>
+  </div>
 
   <script>
     const PROXY_URL = "https://nfc-checkin-system.jinbungkun.workers.dev"; 
@@ -123,6 +144,11 @@
 
     window.onload = () => {
         focusReader();
+        // 번호 입력창에서 엔터 시 출석
+        document.getElementById('manual-phone-input').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') manualCheckin();
+        });
+
         window.addEventListener('keydown', (e) => {
             if (isLoading) return;
             if (e.key === 'F1') {
@@ -140,6 +166,13 @@
         hiddenInput.value = ""; 
       }
     });
+
+    async function manualCheckin() {
+      const val = document.getElementById('manual-phone-input').value.trim();
+      if(val.length < 4) return alert("전화번호 뒤 4자리 이상 입력하세요.");
+      await handleCheckin(val);
+      document.getElementById('manual-phone-input').value = "";
+    }
 
     function handleTagInput(tagId) {
       if (currentTab === 'checkin') handleCheckin(tagId);
@@ -193,6 +226,7 @@
     async function handleCheckin(id) {
       const data = await sendRequest({ action: 'checkin', id: id });
       if(data.status !== 'error') alert(data.name + "님: " + data.message);
+      else alert(data.message);
     }
 
     async function handleSearch(id) {
@@ -209,7 +243,7 @@
       let html = "";
       if(result.data && result.data.length > 0) {
         result.data.forEach(s => {
-          html += `<div class="card-res" style="cursor:pointer" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (선택)</div>`;
+          html += `<div class="card-res" style="cursor:pointer" onclick='selectUser(${JSON.stringify(s)})'>${s.name} (${s.phone || '번호없음'})</div>`;
         });
       }
       const listId = currentTab === 'edit' ? 'name-list' : 'card-name-list';
@@ -222,6 +256,7 @@
           if(currentTab === 'search') {
               document.getElementById('search-res').style.display = 'block';
               document.getElementById('s-name').innerText = student.name + " 학생";
+              document.getElementById('s-phone').innerText = student.phone || "미등록";
               document.getElementById('s-point').innerText = student.point;
           } else {
               document.getElementById('edit-area').style.display = 'block';
@@ -259,8 +294,9 @@
     async function requestAdd() {
       const id = document.getElementById('add-id').value;
       const name = document.getElementById('add-name').value;
-      if(!id || !name) return alert("ID와 이름을 모두 입력하세요.");
-      const data = await sendRequest({ action: 'add', id: id, name: name, point: 0 });
+      const phone = document.getElementById('add-phone').value;
+      if(!id || !name || !phone) return alert("ID, 이름, 전화번호를 모두 입력하세요.");
+      const data = await sendRequest({ action: 'add', id: id, name: name, phone: phone, point: 0 });
       alert(data.message);
       showPage('checkin');
     }
