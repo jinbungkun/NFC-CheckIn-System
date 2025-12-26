@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NFC Attendance & Admin System</title>
+  <title>NFC Dynamic Attendance System</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
@@ -13,9 +13,9 @@
     #mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
     .admin-lock-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
 
-    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
+    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; white-space: nowrap; }
     .nav::-webkit-scrollbar { display: none; }
-    .nav button { flex: none; width: 75px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+    .nav button { flex: none; min-width: 75px; background: transparent; color: var(--muted); border: none; padding: 12px 10px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
     .nav button.active { background: var(--primary); color: white; }
     
     .admin-only-btn { display: none; } 
@@ -27,7 +27,7 @@
 
     .input-group { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
     .input-group input { margin: 0; flex: 1; }
-    .input-group .btn-search { width: 70px; height: 48px; margin: 0; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; }
+    .btn-search { width: 70px; height: 48px; margin: 0; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; }
 
     input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; }
@@ -37,7 +37,7 @@
     .btn-success { background: var(--success); color: white; }
     .btn-danger { background: var(--danger); color: white; }
 
-    .student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; }
+    .student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; position: relative; }
     .student-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 10px; margin-bottom: 10px; }
     .student-name { font-size: 1.2rem; font-weight: bold; color: white; }
     .student-point { font-size: 1.1rem; color: var(--accent); font-weight: bold; }
@@ -49,7 +49,6 @@
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     
-    /* 리더기 전용 브릿지: 키보드 팝업 방지 */
     #nfc-bridge { position: absolute; left: -9999px; top: 0; }
   </style>
 </head>
@@ -110,14 +109,19 @@
 
   <div id="page-add" class="page">
     <h2>👤 신규 학생 등록</h2>
-    <input type="text" id="add-id" placeholder="카드 ID">
-    <input type="text" id="add-name" placeholder="학생 이름">
-    <input type="tel" id="add-phone" placeholder="전화번호">
+    <div id="dynamic-add-fields">
+      </div>
     <button class="btn btn-success" onclick="registerStudent()">등록하기</button>
   </div>
 
   <div id="page-settings" class="page">
     <h2>⚙️ 설정</h2>
+    <div style="background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--primary);">
+      <h3 style="margin-top:0; font-size:1rem; color:var(--primary);">🚀 초기 설정</h3>
+      <p style="font-size:0.8rem; color:var(--muted)">새 시트에 필수 열(ID, 이름, 전화번호, 포인트 등)을 자동 생성합니다.</p>
+      <button class="btn btn-success" onclick="initSheetStructure()" style="background:var(--primary)">시트 구조 자동 생성</button>
+    </div>
+
     <label style="font-size:0.8rem; color:var(--muted)">구글 앱 스크립트 URL</label>
     <input type="text" id="cfg-url" placeholder="GAS 배포 URL 입력">
     <label style="font-size:0.8rem; color:var(--muted)">관리자 비밀번호 설정</label>
@@ -131,8 +135,37 @@
     let isAdmin = false;
     let isUserTyping = false;
     let isApiLoading = false;
+    let currentSchema = []; // 시트 헤더 저장
     const nfcBridge = document.getElementById('nfc-bridge');
     const statusBadge = document.getElementById('mode-status');
+
+    // --- 핵심: 시트 구조 자동 생성 ---
+    async function initSheetStructure() {
+      if(!confirm("연결된 시트에 기본 데이터 구조를 생성할까요?")) return;
+      const res = await callApi({ action: 'initSheet' });
+      if(res) {
+        alert("시트 초기화 완료!");
+        location.reload();
+      }
+    }
+
+    // --- 핵심: 등록 페이지 동적 생성 ---
+    async function refreshAddFields() {
+      const res = await callApi({ action: 'getSchema' });
+      if(res && res.schema) {
+        currentSchema = res.schema;
+        const container = document.getElementById('dynamic-add-fields');
+        container.innerHTML = "";
+        currentSchema.forEach(header => {
+          const input = document.createElement('input');
+          input.type = "text";
+          input.id = `add-field-${header}`;
+          input.placeholder = header;
+          if(header === 'ID') input.placeholder = "ID (카드 태그 시 자동입력)";
+          container.appendChild(input);
+        });
+      }
+    }
 
     function setAdminState(state) {
       isAdmin = state;
@@ -161,19 +194,8 @@
     }
 
     function showPage(p) {
-      // 1. 카테고리 전환 시 현재 떠있는 모든 키보드를 즉시 강제 종료
-      if (document.activeElement) {
-        document.activeElement.blur();
-      }
-      
+      if (document.activeElement) document.activeElement.blur();
       if(!isAdmin && p !== 'checkin') return;
-
-      document.querySelectorAll('input').forEach(input => {
-        if(input.id !== 'cfg-url' && input.id !== 'cfg-pw') input.value = ""; 
-      });
-
-      const containers = ['search-results', 'point-target-area', 'card-target-area'];
-      containers.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ""; });
 
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       const targetPage = document.getElementById('page-' + p);
@@ -183,47 +205,20 @@
       const activeBtn = document.getElementById('nav-' + p);
       if(activeBtn) activeBtn.classList.add('active');
       
+      if(p === 'add') refreshAddFields(); // 등록 페이지 열 때 필드 갱신
+
       isUserTyping = false;
       isApiLoading = false;
       window.scrollTo(0,0);
-
-      // 키보드가 내려가고 나서 리더기용 포커스를 잡음 (inputmode="none"이라 키보드 안 올라옴)
       setTimeout(focusNfc, 500);
     }
 
     function focusNfc() {
-      // 사용자가 수동 입력창을 건드리고 있다면 리더기가 포커스를 뺏지 않음
       if (isUserTyping || isApiLoading) return;
-      
       nfcBridge.focus({ preventScroll: true });
-      if(!isAdmin) {
-        statusBadge.innerText = "● 리더기 모드";
-        statusBadge.style.background = "#064e3b";
-      }
     }
 
-    document.querySelectorAll('input').forEach(el => {
-      // nfc-bridge를 제외한 일반 입력창 클릭 시에만 키보드 허용
-      if (el.id !== 'nfc-bridge') {
-        el.addEventListener('focus', () => { isUserTyping = true; });
-        el.addEventListener('blur', () => { 
-          isUserTyping = false; 
-          setTimeout(focusNfc, 800); 
-        });
-      }
-      
-      el.addEventListener('keypress', (e) => {
-        if(e.key === 'Enter') {
-          e.target.blur(); // 엔터 시 키보드 닫기
-          const activePage = document.querySelector('.page.active').id;
-          if(activePage === 'page-checkin') doCheckin();
-          else if(activePage === 'page-search') findStudent('search');
-          else if(activePage === 'page-point') findStudent('point');
-          else if(activePage === 'page-card') findStudent('card');
-        }
-      });
-    });
-
+    // NFC 태그 시 처리 로직
     nfcBridge.addEventListener('keydown', (e) => {
       if(e.key === 'Enter') {
         const val = nfcBridge.value.trim();
@@ -238,95 +233,54 @@
         document.getElementById('manual-id').value = val;
         doCheckin();
       } else if(isAdmin) {
-        if(activePage === 'page-point') findStudentByNfc(val, 'point');
-        else if(activePage === 'page-card') {
-          const newInp = document.getElementById('new-card-input');
-          if(newInp) { newInp.value = val; execCardChange(null, "태그된"); }
-          else findStudentByNfc(val, 'card');
-        } else if(activePage === 'page-add') document.getElementById('add-id').value = val;
-      }
-    }
-
-    async function findStudent(pageType) {
-      document.activeElement.blur();
-      isUserTyping = false;
-
-      const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
-      const name = document.getElementById(inputId).value.trim();
-      if(!name) return;
-
-      const res = await callApi({ action: 'searchName', name: name });
-      const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
-      const container = document.getElementById(containerId);
-      container.innerHTML = "";
-      
-      if(res && res.data && res.data.length > 0) {
-        if(res.data.length === 1) renderActionArea(res.data[0], pageType);
-        else {
-          res.data.forEach(s => {
-            const div = document.createElement('div');
-            div.className = 'student-info-card';
-            div.innerHTML = `<div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div>
-                             <div style="font-size:0.85rem; color:var(--muted)">ID: ${s.id}</div>`;
-            div.onclick = () => renderActionArea(s, pageType);
-            container.appendChild(div);
-          });
+        if(activePage === 'page-add') {
+            const idField = document.getElementById('add-field-ID');
+            if(idField) idField.value = val;
+        } else if(activePage === 'page-card') {
+            const newInp = document.getElementById('new-card-input');
+            if(newInp) { newInp.value = val; } 
+            else findStudentByNfc(val, 'card');
+        } else if(activePage === 'page-point') {
+            findStudentByNfc(val, 'point');
         }
-        setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-      } else { alert("검색 결과가 없습니다."); }
-    }
-
-    async function findStudentByNfc(id, pageType) {
-      const res = await callApi({ action: 'searchName', name: '' }); 
-      if(res && res.data) {
-        const student = res.data.find(s => String(s.id) === String(id));
-        if(student) renderActionArea(student, pageType);
-        else alert("등록되지 않은 카드입니다.");
       }
     }
 
+    // --- 핵심: 정보 조회 시 모든 데이터 출력 ---
     function renderActionArea(s, type) {
       const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
+      
+      let allInfoHtml = "";
+      Object.keys(s).forEach(key => {
+          if(key !== '이름' && key !== '포인트') {
+              allInfoHtml += `<div style="font-size:0.85rem; color:var(--muted)">${key}: ${s[key] || '-'}</div>`;
+          }
+      });
+
       if(type === 'point') {
         container.innerHTML = `<div class="student-info-card" style="border-left:5px solid var(--success)">
-          <div class="student-header"><span class="student-name">${s.name}님</span><span class="student-point" id="cur-pt">${s.point} pt</span></div>
-          <div class="point-grid"><button class="btn btn-success" onclick="updatePt('${s.id}', 100)">+100</button><button class="btn btn-success" onclick="updatePt('${s.id}', 300)">+300</button><button class="btn btn-success" onclick="updatePt('${s.id}', 500)">+500</button><button class="btn btn-success" onclick="updatePt('${s.id}', 1000)">+1000</button></div>
-          <div style="display:flex; gap:8px; margin-top:10px;"><input type="number" id="direct-pt" placeholder="기타 점수" style="margin:0;"><button class="btn btn-primary" style="width:70px; margin:0;" onclick="updatePt('${s.id}', 'direct')">지급</button></div></div>`;
-      } else if(type === 'card') {
-        container.innerHTML = `<div class="student-info-card" style="border-left:5px solid var(--danger)"><div class="student-header"><span class="student-name">${s.name} 카드교체</span></div><p style="font-size:0.8rem; color:var(--muted)">현재 ID: ${s.id}</p><div style="display:flex; gap:8px;"><input type="text" id="new-card-input" placeholder="새 카드 태그하세요" style="margin:0;"><button class="btn btn-danger" style="width:70px; margin:0;" onclick="execCardChange('${s.id}', '${s.name}')">교체</button></div></div>`;
+          <div class="student-header"><span class="student-name">${s.이름}님</span><span class="student-point" id="cur-pt">${s.포인트 || 0} pt</span></div>
+          ${allInfoHtml}
+          <div class="point-grid"><button class="btn btn-success" onclick="updatePt('${s.ID}', 100)">+100</button><button class="btn btn-success" onclick="updatePt('${s.ID}', 500)">+500</button></div>
+          <div style="display:flex; gap:8px; margin-top:10px;"><input type="number" id="direct-pt" placeholder="기타 점수" style="margin:0;"><button class="btn btn-primary" style="width:70px; margin:0;" onclick="updatePt('${s.ID}', 'direct')">지급</button></div></div>`;
       } else if(type === 'search') {
-        container.innerHTML = `<div class="student-info-card"><div class="student-header"><span class="student-name">${s.name}</span><span class="student-point">${s.point} pt</span></div><div style="font-size:0.9rem; color:var(--muted)">ID: ${s.id} | 연락처: ${s.phone || '미등록'}</div></div>`;
+        container.innerHTML = `<div class="student-info-card">
+            <div class="student-header"><span class="student-name">${s.이름}</span><span class="student-point">${s.포인트 || 0} pt</span></div>
+            ${allInfoHtml}
+        </div>`;
+      } else if(type === 'card') {
+        container.innerHTML = `<div class="student-info-card" style="border-left:5px solid var(--danger)">
+            <div class="student-header"><span class="student-name">${s.이름} 카드교체</span></div>
+            <p style="font-size:0.8rem; color:var(--muted)">기존 ID: ${s.ID}</p>
+            <div style="display:flex; gap:8px;"><input type="text" id="new-card-input" placeholder="새 카드 태그" style="margin:0;"><button class="btn btn-danger" style="width:70px; margin:0;" onclick="execCardChange('${s.ID}', '${s.이름}')">교체</button></div></div>`;
       }
       setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
 
-    async function updatePt(id, amt) {
-      const val = amt === 'direct' ? document.getElementById('direct-pt').value : amt;
-      if(!val) return;
-      const res = await callApi({ action: 'updatePoint', id: id, amount: val });
-      if(res) {
-        alert("지급 완료");
-        const ptElem = document.getElementById('cur-pt');
-        if(ptElem) ptElem.innerText = (parseInt(ptElem.innerText) + parseInt(val)) + " pt";
-      }
-    }
-
-    async function execCardChange(oldId, name) {
-      const newInp = document.getElementById('new-card-input');
-      const newId = newInp ? newInp.value : "";
-      if(!newId) return alert("새 카드를 태그하세요.");
-      
-      // oldId가 null이면 현재 검색된 카드의 정보를 찾아야 함 (NFC 바로 교체 케이스 대응)
-      if(confirm(`${name}님의 카드를 교체할까요?`)) {
-        const res = await callApi({ action: 'updateId', oldId: oldId || document.querySelector('.student-info-card p').innerText.split(': ')[1], newId: newId });
-        if(res) { alert("교체 완료"); showPage('checkin'); }
-      }
-    }
-
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
-      if(!url) { showPage('settings'); return null; }
+      if(!url && data.action !== 'saveSettings') { showPage('settings'); return null; }
       isApiLoading = true;
       document.getElementById('loader').style.display = 'flex';
       try {
@@ -341,17 +295,45 @@
     }
 
     async function doCheckin() {
-      document.activeElement.blur();
       const val = document.getElementById('manual-id').value;
       if(!val) return;
       const res = await callApi({ action: 'checkin', id: val });
-      if(res) alert(`${res.name}: ${res.message}`);
+      if(res) alert(`${res.name || '알 수 없음'}: ${res.message}`);
       document.getElementById('manual-id').value = "";
     }
 
     async function registerStudent() {
-      const res = await callApi({ action: 'add', id: document.getElementById('add-id').value, name: document.getElementById('add-name').value, phone: document.getElementById('add-phone').value });
-      if(res) { alert(res.message); showPage('checkin'); }
+      const payload = { action: 'add' };
+      currentSchema.forEach(header => {
+        payload[header] = document.getElementById(`add-field-${header}`).value;
+      });
+      const res = await callApi(payload);
+      if(res) { alert("등록 완료"); showPage('checkin'); }
+    }
+
+    async function findStudent(pageType) {
+      const inputId = pageType === 'search' ? 'search-input' : (pageType === 'point' ? 'point-search-input' : 'card-search-input');
+      const name = document.getElementById(inputId).value.trim();
+      if(!name) return;
+      const res = await callApi({ action: 'searchName', name: name });
+      const containerId = pageType === 'search' ? 'search-results' : (pageType === 'point' ? 'point-target-area' : 'card-target-area');
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      if(res && res.data && res.data.length > 0) {
+        res.data.forEach(s => renderActionArea(s, pageType));
+      } else { alert("검색 결과가 없습니다."); }
+    }
+
+    async function findStudentByNfc(id, pageType) {
+      const res = await callApi({ action: 'searchId', id: id });
+      if(res && res.success) renderActionArea(res.data, pageType);
+      else alert("등록되지 않은 카드입니다.");
+    }
+
+    async function updatePt(id, amt) {
+      const val = amt === 'direct' ? document.getElementById('direct-pt').value : amt;
+      const res = await callApi({ action: 'updatePoint', id: id, amount: val });
+      if(res) { alert("지급 완료"); location.reload(); }
     }
 
     function saveSettings() {
@@ -367,13 +349,6 @@
       if(url) document.getElementById('cfg-url').value = url;
       setAdminState(localStorage.getItem('IS_ADMIN_ACTIVE') === "true");
       focusNfc();
-    };
-    
-    document.body.onclick = (e) => { 
-      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { 
-        isUserTyping = false; 
-        focusNfc(); 
-      } 
     };
   </script>
 </body>
