@@ -2,247 +2,198 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <title>도장 통합 관리 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NFC 도장 관리 시스템</title>
   <style>
-    :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
-    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    #mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
-    #mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
-    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
-    .nav button { flex: none; min-width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-    .nav button.active { background: var(--primary); color: white; }
+    :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --accent: #f59e0b; --text: #f8fafc; }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+    .page { display: none; } .page.active { display: block; }
+    .glass-card { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 15px; }
+    input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #334155; background: #000; color: #fff; box-sizing: border-box; }
+    .btn { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn-blue { background: var(--primary); color: white; width: 100%; }
     .admin-only { display: none; }
-    .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-    .page.active { display: block; }
-    input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
-    .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-success { background: var(--success); color: white; }
-    
-    /* 명단 테이블 스타일 */
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-    th, td { padding: 12px 8px; border-bottom: 1px solid #334155; text-align: left; }
-    th { color: var(--muted); }
-    .pt-badge { background: var(--accent); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-    
-    #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
-    .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #nfc-bridge { position: absolute; left: -9999px; }
+    /* 포인트 버튼 그룹 */
+    .pt-grid { display: grid; grid-template-columns: 1-1-1-1; gap: 10px; margin: 10px 0; }
+    .pt-btn { background: #334155; color: white; padding: 10px; border-radius: 8px; border: 1px solid var(--primary); cursor: pointer; }
+    .nav { display: flex; gap: 5px; overflow-x: auto; margin-bottom: 15px; }
+    .nav button { background: var(--card); color: #94a3b8; border: none; padding: 10px 15px; border-radius: 8px; white-space: nowrap; }
+    .nav button.active { background: var(--primary); color: white; }
   </style>
 </head>
 <body>
 
-  <div id="loader"><div class="spinner"></div><p style="margin-top:15px;">서버 통신 중...</p></div>
-
-  <div class="header">
-    <div><span id="mode-status">● 학생 모드</span></div>
-    <button style="background:var(--card); border:none; color:white; padding:10px; border-radius:10px;" onclick="toggleAdmin()">🔒</button>
+  <div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+    <span id="admin-tag" style="font-size:0.8rem; color:var(--accent);"></span>
+    <button onclick="toggleAdmin()" id="lock-btn">🔒</button>
   </div>
 
   <div class="nav">
-    <button onclick="showPage('checkin')" id="nav-checkin" class="active">출석</button>
-    <button onclick="showPage('list')" id="nav-list" class="admin-only">명단조회</button>
+    <button onclick="showPage('checkin')" id="nav-checkin" class="active">출석/조회</button>
+    <button onclick="showPage('manage')" id="nav-manage" class="admin-only">포인트/교체</button>
     <button onclick="showPage('add')" id="nav-add" class="admin-only">신규등록</button>
     <button onclick="showPage('settings')" id="nav-settings" class="admin-only">설정</button>
   </div>
 
-  <div id="page-settings" class="page">
-    <h2 style="margin-top:0">⚙️ 시스템 연결</h2>
-    <input type="text" id="cfg-url" placeholder="구글 앱 스크립트 URL">
-    <input type="password" id="cfg-pw" placeholder="관리자 비밀번호 (4자리 이상)">
-    <button class="btn btn-primary" onclick="setupSystem()">연결 및 시작하기</button>
-    <p style="font-size:0.8rem; color:var(--muted); margin-top:15px;">※ 이미 시트가 있다면 기존 비번을 입력해야 연결됩니다.</p>
-  </div>
-
   <div id="page-checkin" class="page active">
-    <div style="text-align:center">
-      <h2 id="display-msg">📡 NFC 카드를 태그하세요</h2>
-      <div id="result-area" style="margin: 20px 0; min-height: 50px; font-size: 1.2rem; font-weight: bold; color: var(--success);"></div>
-      <input type="tel" id="manual-id" placeholder="ID 직접 입력" style="text-align:center;">
-      <button class="btn btn-primary" onclick="doCheckin()">수동 출석</button>
+    <div class="glass-card">
+      <h2 style="text-align:center;">📡 NFC 태그</h2>
+      <div id="scan-result" style="text-align:center; padding:15px; font-size:1.1rem; color:var(--success);">학생 정보를 기다리는 중...</div>
+      <input type="tel" id="main-id" placeholder="ID 직접 입력 (엔터)">
     </div>
   </div>
 
-  <div id="page-list" class="page">
-    <h2>📋 학생 명단 관리</h2>
-    <div style="overflow-x:auto;">
-      <table id="student-table">
-        <thead><tr><th>이름</th><th>포인트</th><th>관리</th></tr></thead>
-        <tbody></tbody>
-      </table>
+  <div id="page-manage" class="page">
+    <div class="glass-card">
+      <h3>💰 포인트 지급</h3>
+      <p id="target-info">대상을 먼저 태그하세요.</p>
+      <div class="pt-grid">
+        <button class="pt-btn" onclick="addPt(100)">100</button>
+        <button class="pt-btn" onclick="addPt(300)">300</button>
+        <button class="pt-btn" onclick="addPt(500)">500</button>
+        <button class="pt-btn" onclick="addPt(1000)">1000</button>
+      </div>
+      <input type="number" id="custom-pt" placeholder="기타 포인트 직접 입력">
+      <button class="btn btn-blue" onclick="addPt(document.getElementById('custom-pt').value)">지급하기</button>
+    </div>
+
+    <div class="glass-card" style="border: 1px solid var(--danger);">
+      <h3>🎴 카드 분실/교체</h3>
+      <input type="text" id="replace-name" placeholder="이름 검색">
+      <input type="text" id="replace-new-id" placeholder="새로운 NFC 카드 태그" readonly>
+      <button class="btn btn-blue" style="background:var(--danger);" onclick="replaceCard()">카드 정보 업데이트</button>
     </div>
   </div>
 
   <div id="page-add" class="page">
-    <h2>👤 신규 학생 등록</h2>
-    <div id="dynamic-fields"></div>
-    <button class="btn btn-success" onclick="registerStudent()">학생 등록 완료</button>
+    <div class="glass-card">
+      <h3>👤 신규 등록</h3>
+      <input id="add-id" placeholder="ID (태그하세요)" readonly>
+      <input id="add-name" placeholder="학생 이름">
+      <input id="add-tel" placeholder="전화번호">
+      <button class="btn btn-blue" onclick="register()">등록 완료</button>
+    </div>
   </div>
 
-  <input type="text" id="nfc-bridge" inputmode="none">
+  <div id="page-settings" class="page">
+    <div class="glass-card">
+      <input id="cfg-url" placeholder="GAS URL">
+      <input id="cfg-pw" placeholder="초기 비번">
+      <button class="btn btn-blue" onclick="setup()">저장</button>
+    </div>
+  </div>
+
+  <input type="text" id="nfc-bridge" style="position:fixed; left:-9999px;">
 
   <script>
-    let isAdmin = false;
-    let currentSchema = [];
-    const nfcBridge = document.getElementById('nfc-bridge');
+    let isAdmin = localStorage.getItem('isAdmin') === 'true';
+    let currentStudentId = null;
 
     window.onload = () => {
-      const savedUrl = localStorage.getItem('GAS_URL');
-      if (!savedUrl) showPage('settings');
-      else {
-        document.getElementById('cfg-url').value = savedUrl;
-        showPage('checkin');
-      }
-      nfcBridge.focus();
+      updateAdminUI();
+      if(!localStorage.getItem('GAS_URL')) showPage('settings');
+      focusBridge();
     };
 
-    // [초기 설정] URL과 비번 한번에 저장
-    async function setupSystem() {
-      const url = document.getElementById('cfg-url').value.trim();
-      const pw = document.getElementById('cfg-pw').value.trim();
-      if(!url || pw.length < 4) return alert("URL과 비밀번호(4자 이상)를 입력하세요.");
-      
-      localStorage.setItem('GAS_URL', url);
-      const res = await callApi({ action: 'initSheet', pw: pw });
-      if(res && res.status === "success") {
-        alert(res.message);
-        showPage('checkin');
-      } else {
-        if(res) alert(res.message);
-        localStorage.removeItem('GAS_URL');
+    function focusBridge() { document.getElementById('nfc-bridge').focus(); }
+    document.body.onclick = () => focusBridge();
+
+    // [핵심] 리더기 입력 처리
+    document.getElementById('nfc-bridge').onkeydown = async (e) => {
+      if(e.key === 'Enter') {
+        const id = e.target.value;
+        const page = document.querySelector('.page.active').id;
+
+        if(page === 'page-checkin') {
+          const res = await callApi({action: 'getStudent', id: id});
+          if(res.success) {
+            currentStudentId = id;
+            document.getElementById('scan-result').innerHTML = `<b>${res.data.이름}</b> [${res.data.포인트} PT]<br>출석 확인됨!`;
+            if(isAdmin) document.getElementById('target-info').innerText = `선택됨: ${res.data.이름}`;
+            // 출석 로직 실행
+            callApi({action: 'checkin', id: id});
+          } else {
+            document.getElementById('scan-result').innerText = "미등록 카드입니다.";
+          }
+        } else if(page === 'page-manage') {
+          document.getElementById('replace-new-id').value = id; // 카드 교체용 ID 필드
+        } else if(page === 'page-add') {
+          document.getElementById('add-id').value = id;
+        }
+        e.target.value = "";
+      }
+    };
+
+    async function addPt(val) {
+      if(!currentStudentId) return alert("대상을 먼저 태그하세요.");
+      const res = await callApi({action: 'addPoints', id: currentStudentId, amount: val});
+      if(res.success) {
+        alert("지급 완료! 현재: " + res.newTotal);
+        document.getElementById('target-info').innerText = `선택됨: ${currentStudentId} (현재 ${res.newTotal} PT)`;
       }
     }
 
-    // [관리자 인증]
+    async function replaceCard() {
+      const name = document.getElementById('replace-name').value;
+      const newId = document.getElementById('replace-new-id').value;
+      if(!name || !newId) return alert("이름 검색과 새 카드 태그가 필요합니다.");
+      const res = await callApi({action: 'replaceCard', name: name, newId: newId});
+      alert(res.message);
+    }
+
     async function toggleAdmin() {
-      if (!isAdmin) {
-        const pw = prompt("관리자 비밀번호를 입력하세요.");
-        if (!pw) return;
-        const res = await callApi({ action: 'verifyPw', pw: pw });
-        if (res && res.success) { isAdmin = true; updateAdminUI(); }
-        else { alert("비밀번호가 틀렸습니다."); }
-      } else { isAdmin = false; updateAdminUI(); }
+      if(!isAdmin) {
+        const pw = prompt("관리자 비번");
+        const res = await callApi({action: 'verifyPw', pw: pw});
+        if(res && res.success) {
+          isAdmin = true;
+          localStorage.setItem('isAdmin', 'true'); // 관리자 상태 유지
+          updateAdminUI();
+        }
+      } else {
+        isAdmin = false;
+        localStorage.setItem('isAdmin', 'false');
+        updateAdminUI();
+      }
     }
 
     function updateAdminUI() {
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
-      document.getElementById('mode-status').innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
-      document.getElementById('mode-status').classList.toggle('admin-active', isAdmin);
-      if(!isAdmin) showPage('checkin');
+      document.getElementById('admin-tag').innerText = isAdmin ? "● 관리자 모드 유지됨" : "";
+      document.getElementById('lock-btn').innerText = isAdmin ? "🔓" : "🔒";
     }
 
-    // [출석 로직]
-    async function doCheckin() {
-      const id = document.getElementById('manual-id').value;
-      if(!id) return;
-      const res = await callApi({ action: 'checkin', id: id });
-      const area = document.getElementById('result-area');
-      if(res && res.name) {
-        area.innerHTML = `🎉 ${res.name}님 출석!<br><small>${res.message}</small>`;
-        area.style.color = "var(--success)";
-      } else {
-        area.innerHTML = res ? res.message : "통신 에러";
-        area.style.color = "var(--danger)";
-      }
-      document.getElementById('manual-id').value = "";
+    async function showPage(p) {
+      document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.querySelectorAll('.nav button').forEach(el => el.classList.remove('active'));
+      document.getElementById('nav-'+p).classList.add('active');
+      focusBridge();
     }
 
-    // [명단 로직]
-    async function loadStudentList() {
-      const res = await callApi({ action: 'getList' });
-      if(res && res.data) {
-        const tbody = document.querySelector('#student-table tbody');
-        tbody.innerHTML = "";
-        res.data.slice(1).forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${row[1]}<br><small style="color:var(--muted)">${row[0]}</small></td>
-            <td><span class="pt-badge">${row[3]}</span></td>
-            <td><button onclick="editPoint('${row[0]}', ${row[3]})" style="background:var(--primary); border:none; color:white; padding:5px 10px; border-radius:5px;">수정</button></td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
-    }
-
-    async function editPoint(id, current) {
-      const newPt = prompt("변경할 포인트를 입력하세요:", current);
-      if(newPt === null) return;
-      const res = await callApi({ action: 'updatePoint', id: id, newPoint: Number(newPt) });
-      if(res) loadStudentList();
-    }
-
-    // [등록 로직]
-    async function refreshAddFields() {
-      const res = await callApi({ action: 'getSchema' });
-      if(res && res.schema) {
-        currentSchema = res.schema;
-        const container = document.getElementById('dynamic-fields');
-        container.innerHTML = "";
-        currentSchema.forEach(h => {
-          if(["등록일", "마지막출석"].includes(h)) return;
-          const input = document.createElement('input');
-          input.id = `field-${h}`;
-          input.placeholder = h + (h === 'ID' ? " (NFC 카드를 태그하세요)" : "");
-          if(h === 'ID') input.readOnly = true;
-          container.appendChild(input);
-        });
-      }
-    }
-
-    async function registerStudent() {
-      const payload = { action: 'add' };
-      currentSchema.forEach(h => {
-        const el = document.getElementById(`field-${h}`);
-        if(el) payload[h] = el.value;
-      });
-      const res = await callApi(payload);
-      if(res) { alert(res.message); showPage('list'); }
-    }
-
-    // [공통 통신]
-    async function callApi(data) {
+    async function callApi(d) {
       const url = localStorage.getItem('GAS_URL');
-      if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
-      document.getElementById('loader').style.display = 'flex';
       try {
-        const response = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
-        return await response.json();
-      } catch (e) { alert("연결 실패! URL 또는 인터넷 상태를 확인하세요."); return null; }
-      finally { document.getElementById('loader').style.display = 'none'; nfcBridge.focus(); }
+        const r = await fetch(url, {method: 'POST', body: JSON.stringify(d)});
+        return await r.json();
+      } catch(e) { return {success:false, message: "통신오류"}; }
     }
 
-    function showPage(p) {
-      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-      document.getElementById('page-' + p).classList.add('active');
-      document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
-      const activeBtn = document.getElementById('nav-' + p);
-      if(activeBtn) activeBtn.classList.add('active');
-      
-      if(p === 'list' && isAdmin) loadStudentList();
-      if(p === 'add' && isAdmin) refreshAddFields();
-      setTimeout(() => nfcBridge.focus(), 500);
+    async function setup() {
+      const url = document.getElementById('cfg-url').value;
+      const pw = document.getElementById('cfg-pw').value;
+      localStorage.setItem('GAS_URL', url);
+      const res = await callApi({action: 'initSheet', pw: pw});
+      alert(res.message);
+      location.reload();
     }
-
-    // [NFC 브릿지]
-    nfcBridge.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') {
-        const val = nfcBridge.value.trim();
-        if(!val) return;
-        const activePage = document.querySelector('.page.active').id;
-        if(activePage === 'page-checkin') {
-          document.getElementById('manual-id').value = val;
-          doCheckin();
-        } else if(isAdmin && activePage === 'page-add') {
-          const idField = document.getElementById('field-ID');
-          if(idField) idField.value = val;
-        }
-        nfcBridge.value = "";
-      }
-    });
+    
+    async function register() {
+      const data = {action: 'add', ID: document.getElementById('add-id').value, 이름: document.getElementById('add-name').value, 전화번호: document.getElementById('add-tel').value, 포인트: 0};
+      const res = await callApi(data);
+      alert(res.message);
+      showPage('checkin');
+    }
   </script>
 </body>
 </html>
