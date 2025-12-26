@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>도장 NFC 시스템</title>
+  <title>도장 NFC 관리 시스템</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; overflow-x: hidden; }
@@ -21,11 +21,10 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; }
-    .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; transition: 0.2s; }
-    .btn:active { transform: scale(0.98); }
+    .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-success { background: var(--success); color: white; }
-    #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.85); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
+    #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     #nfc-bridge { position: absolute; left: -9999px; }
@@ -42,23 +41,16 @@
 
   <div class="nav">
     <button onclick="showPage('checkin')" id="nav-checkin" class="active">출석</button>
-    <button onclick="showPage('search')" id="nav-search" class="admin-only">조회</button>
     <button onclick="showPage('add')" id="nav-add" class="admin-only">등록</button>
     <button onclick="showPage('settings')" id="nav-settings" class="admin-only">설정</button>
   </div>
 
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
-      <h2 style="margin-top:0">📡 NFC 태그하세요</h2>
-      <input type="tel" id="manual-id" placeholder="ID 직접 입력 가능" style="text-align:center; font-size:1.5rem;">
+      <h2 style="margin-top:0">📡 NFC 카드를 태그하세요</h2>
+      <input type="tel" id="manual-id" placeholder="ID 입력" style="text-align:center; font-size:1.5rem;">
       <button class="btn btn-primary" onclick="doCheckin()">수동 출석</button>
     </div>
-  </div>
-
-  <div id="page-search" class="page">
-    <h2>🔍 학생 정보 조회</h2>
-    <input type="text" id="search-input" placeholder="이름 입력 후 엔터">
-    <div id="search-results" style="margin-top:15px;"></div>
   </div>
 
   <div id="page-add" class="page">
@@ -69,16 +61,16 @@
 
   <div id="page-settings" class="page">
     <h2>⚙️ 시스템 설정</h2>
-    <div style="background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); margin-bottom: 20px;">
+    <div style="background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid var(--primary); margin-bottom: 20px;">
       <h4 style="margin:0 0 10px 0; color:var(--primary);">🔗 구글 시트 연결</h4>
-      <p style="font-size:0.75rem; color:var(--muted)">URL 입력 시 기존 데이터는 보호됩니다.</p>
-      <input type="text" id="cfg-url" placeholder="GAS 배포 URL 입력">
-      <button class="btn btn-primary" onclick="setupSystem()">연결 및 데이터 동기화</button>
+      <p style="font-size:0.8rem; color:var(--muted)">앱 스크립트 배포 URL을 입력하고 연결하세요.</p>
+      <input type="text" id="cfg-url" placeholder="https://script.google.com/...">
+      <button class="btn btn-primary" onclick="setupSystem()">연결 및 시작하기</button>
     </div>
     <div style="padding:15px; background: #1e293b; border-radius:12px; border: 1px solid var(--accent);">
       <h4 style="margin:0 0 10px 0; color:var(--accent);">🔑 공통 비밀번호 변경</h4>
       <input type="password" id="new-pw" placeholder="새 비밀번호 입력">
-      <button class="btn btn-success" style="background:var(--accent)" onclick="changeGlobalPw()">전체 기기 비번 변경</button>
+      <button class="btn btn-success" style="background:var(--accent)" onclick="changeGlobalPw()">비밀번호 변경 저장</button>
     </div>
   </div>
 
@@ -89,56 +81,49 @@
     let currentSchema = [];
     const nfcBridge = document.getElementById('nfc-bridge');
 
-    // [시스템 연결] 기존 데이터 보호 로직 포함
+    // [자연스러운 플로우 1] 페이지 로드 시 URL 체크
+    window.onload = () => {
+      const savedUrl = localStorage.getItem('GAS_URL');
+      if (!savedUrl) {
+        showPage('settings');
+        alert("처음이시군요! 구글 시트 URL을 먼저 연결해주세요.");
+      } else {
+        document.getElementById('cfg-url').value = savedUrl;
+        showPage('checkin');
+      }
+      nfcBridge.focus();
+    };
+
+    // [자연스러운 플로우 2] 연결 성공 시 자동 이동
     async function setupSystem() {
       const url = document.getElementById('cfg-url').value.trim();
       if(!url) return alert("URL을 입력하세요.");
       localStorage.setItem('GAS_URL', url);
       const res = await callApi({ action: 'initSheet' });
-      if(res) { alert(res.message); location.reload(); }
+      if(res && res.status === "success") {
+        alert(res.message);
+        showPage('checkin'); // 성공 시 즉시 서비스 화면으로 이동
+      } else {
+        localStorage.removeItem('GAS_URL');
+      }
     }
 
-    // [관리자 인증] 시트 기반 공통 비번
+    // [관리자 인증] 시트 비번 공유
     async function toggleAdmin() {
       if (!isAdmin) {
-        const pw = prompt("관리자 비밀번호를 입력하세요.");
+        const pw = prompt("공통 관리자 비밀번호를 입력하세요.");
         if (!pw) return;
         const res = await callApi({ action: 'verifyPw', pw: pw });
-        if (res && res.success) {
-          isAdmin = true;
-          updateAdminUI();
-        } else { alert("비밀번호가 틀렸습니다."); }
-      } else {
-        isAdmin = false;
-        updateAdminUI();
-      }
+        if (res && res.success) { isAdmin = true; updateAdminUI(); }
+        else { alert("비밀번호 오류"); }
+      } else { isAdmin = false; updateAdminUI(); }
     }
 
     function updateAdminUI() {
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
       document.getElementById('mode-status').innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
       document.getElementById('mode-status').classList.toggle('admin-active', isAdmin);
-      if(!isAdmin) showPage('checkin');
     }
-
-    async function changeGlobalPw() {
-      const newPw = document.getElementById('new-pw').value;
-      if(newPw.length < 4) return alert("4자리 이상 입력하세요.");
-      const res = await callApi({ action: 'changePw', newPw: newPw });
-      if(res && res.success) alert("비밀번호가 성공적으로 변경되었습니다.");
-    }
-
-    // [NFC 리더기 처리]
-    nfcBridge.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') {
-        const val = nfcBridge.value.trim();
-        if(!val) return;
-        const active = document.querySelector('.page.active').id;
-        if(active === 'page-checkin') { document.getElementById('manual-id').value = val; doCheckin(); }
-        else if(isAdmin && active === 'page-add') { document.getElementById('field-ID').value = val; }
-        nfcBridge.value = "";
-      }
-    });
 
     async function doCheckin() {
       const id = document.getElementById('manual-id').value;
@@ -177,28 +162,47 @@
 
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
-      if(!url && data.action !== 'setupSystem') { showPage('settings'); return null; }
+      if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
       document.getElementById('loader').style.display = 'flex';
       try {
-        const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
-        return await res.json();
-      } catch (e) { alert("연결 오류 발생"); return null; }
-      finally { document.getElementById('loader').style.display = 'none'; nfcBridge.focus(); }
+        const response = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+        return await response.json();
+      } catch (e) { 
+        alert("연결 오류: URL 배포 설정을 확인하세요."); 
+        return null; 
+      } finally { 
+        document.getElementById('loader').style.display = 'none'; 
+        nfcBridge.focus(); 
+      }
     }
 
     function showPage(p) {
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       document.getElementById('page-' + p).classList.add('active');
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
-      document.getElementById('nav-' + p).classList.add('active');
+      const activeBtn = document.getElementById('nav-' + p);
+      if(activeBtn) activeBtn.classList.add('active');
       if(p === 'add') refreshAddFields();
       setTimeout(() => nfcBridge.focus(), 500);
     }
 
-    window.onload = () => {
-      document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
-      nfcBridge.focus();
-    };
+    nfcBridge.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') {
+        const val = nfcBridge.value.trim();
+        if(!val) return;
+        const active = document.querySelector('.page.active').id;
+        if(active === 'page-checkin') { document.getElementById('manual-id').value = val; doCheckin(); }
+        else if(isAdmin && active === 'page-add') { document.getElementById('field-ID').value = val; }
+        nfcBridge.value = "";
+      }
+    });
+
+    async function changeGlobalPw() {
+      const newPw = document.getElementById('new-pw').value;
+      if(newPw.length < 4) return alert("4자리 이상 입력하세요.");
+      const res = await callApi({ action: 'changePw', newPw: newPw });
+      if(res && res.success) alert("전체 기기 비밀번호 변경 완료");
+    }
   </script>
 </body>
 </html>
