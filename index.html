@@ -23,9 +23,9 @@
     .page.active { display: block !important; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    .input-group { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
-    input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
+    input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; background: #000; }
+    input[readonly] { background: #1e293b; color: var(--muted); cursor: not-allowed; }
     
     .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 8px; }
     .btn-primary { background: var(--primary); color: white; }
@@ -33,10 +33,12 @@
     .btn-danger { background: var(--danger); color: white; }
 
     .student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; }
+    .student-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #475569; padding-bottom: 5px; }
     .point-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     
     #loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
     #nfc-bridge { position: absolute; left: -9999px; opacity: 0; }
+    .detail-info { font-size: 0.85rem; color: var(--muted); margin: 2px 0; }
   </style>
 </head>
 <body>
@@ -89,9 +91,8 @@
 
   <div id="page-add" class="page">
     <h2>👤 학생 등록</h2>
-    <input type="text" id="add-id" placeholder="카드 ID (태그하세요)">
-    <input type="text" id="add-name" placeholder="학생 이름">
-    <input type="tel" id="add-phone" placeholder="전화번호">
+    <p style="font-size:0.8rem; color:var(--muted)">시트 카테고리에 맞춰 양식이 생성됩니다.</p>
+    <div id="dynamic-add-fields"></div>
     <button class="btn btn-success" onclick="registerStudent()">등록하기</button>
   </div>
 
@@ -99,7 +100,7 @@
     <h2>⚙️ 설정</h2>
     <input type="text" id="cfg-url" placeholder="GAS 배포 URL">
     <input type="password" id="cfg-pw" placeholder="관리자 비번">
-    <button class="btn btn-primary" onclick="saveSettings()">저장 및 연결</button>
+    <button class="btn btn-primary" onclick="saveSettings()">저장 및 시트 연결</button>
   </div>
 
   <input type="text" id="nfc-bridge" inputmode="none">
@@ -108,9 +109,10 @@
     let isAdmin = false;
     let isUserTyping = false;
     let isApiLoading = false;
+    let currentHeaders = []; // 시트 헤더 저장
     const nfcBridge = document.getElementById('nfc-bridge');
 
-    // [중요] 포커스 경쟁 해결 로직
+    // [핵심] 포커스 제어
     function focusNfc() {
       if (isUserTyping || isApiLoading) return;
       if (document.activeElement.tagName !== 'INPUT') {
@@ -118,7 +120,6 @@
       }
     }
 
-    // 모든 입력 필드에 감시 이벤트 추가
     function initFocusGuard() {
       document.querySelectorAll('input').forEach(el => {
         if (el.id === 'nfc-bridge') return;
@@ -129,7 +130,31 @@
       });
     }
 
-    // 관리자 모드 (시트 비번 연동 + 로컬 유지)
+    // [동적 UI] 시트 카테고리에 따라 등록 폼 생성
+    async function refreshSchema() {
+      const res = await callApi({ action: 'getSchema' });
+      if (!res || !res.headers) return;
+      currentHeaders = res.headers;
+      
+      const container = document.getElementById('dynamic-add-fields');
+      container.innerHTML = "";
+      
+      currentHeaders.forEach(header => {
+        // 자동 계산 항목은 입력창에서 제외
+        if (['포인트', '등록일', '마지막출석'].includes(header)) return;
+        
+        const input = document.createElement('input');
+        input.placeholder = header;
+        input.id = `field-${header}`;
+        if (header === 'ID') {
+          input.readOnly = true;
+          input.placeholder = "ID (카드를 태그하세요)";
+        }
+        container.appendChild(input);
+      });
+      initFocusGuard();
+    }
+
     async function toggleAdmin() {
       if (!isAdmin) {
         const pw = prompt("관리자 비밀번호");
@@ -139,6 +164,7 @@
           isAdmin = true;
           localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
           updateAdminUI();
+          refreshSchema(); // 관리자 모드 진입 시 스키마 갱신
         } else { alert("비밀번호 오류"); }
       } else {
         isAdmin = false;
@@ -164,7 +190,6 @@
       setTimeout(focusNfc, 300);
     }
 
-    // NFC 입력 처리
     nfcBridge.addEventListener('keydown', (e) => {
       if(e.key === 'Enter') {
         const val = nfcBridge.value.trim();
@@ -179,18 +204,17 @@
         document.getElementById('manual-id').value = val;
         doCheckin();
       } else if(isAdmin) {
-        if(active === 'page-point') findByNfc(val, 'point');
-        else if(active === 'page-card') {
+        if(active === 'page-add') {
+          const idInp = document.getElementById('field-ID');
+          if(idInp) idInp.value = val;
+        } else if(active === 'page-card') {
           const newInp = document.getElementById('new-card-input');
           if(newInp) newInp.value = val;
           else findByNfc(val, 'card');
-        } else if(active === 'page-add') {
-          document.getElementById('add-id').value = val;
-        }
+        } else if(active === 'page-point') findByNfc(val, 'point');
       }
     }
 
-    // API 통신
     async function callApi(data) {
       const url = localStorage.getItem('GAS_URL');
       if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
@@ -199,7 +223,7 @@
       try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         return await res.json();
-      } catch (e) { alert("통신 실패"); return null; }
+      } catch (e) { return null; }
       finally { isApiLoading = false; document.getElementById('loader').style.display = 'none'; focusNfc(); }
     }
 
@@ -212,7 +236,7 @@
 
     async function findByNfc(id, type) {
       const res = await callApi({ action: 'searchName', name: '' });
-      const student = res.data.find(s => String(s.id) === String(id));
+      const student = res.data.find(s => String(s.ID) === String(id));
       if(student) renderResults([student], type);
       else alert("등록되지 않은 카드");
     }
@@ -220,29 +244,43 @@
     function renderResults(data, type) {
       const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
       const container = document.getElementById(containerId);
-      container.innerHTML = data.map(s => `
-        <div class="student-info-card">
-          <div style="display:flex; justify-content:space-between;"><b>${s.name}</b> <span>${s.point} pt</span></div>
-          ${type === 'point' ? `
-            <div class="point-grid">
-              <button class="btn btn-success" onclick="updatePt('${s.id}', 100)">+100</button>
-              <button class="btn btn-success" onclick="updatePt('${s.id}', 500)">+500</button>
-              <button class="btn btn-success" onclick="updatePt('${s.id}', 1000)">+1000</button>
-              <button class="btn btn-primary" onclick="updatePt('${s.id}', prompt('지급할 포인트'))">직접</button>
-            </div>
-          ` : ''}
-          ${type === 'card' ? `
-            <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
-            <button class="btn btn-danger" onclick="execCardChange('${s.id}', '${s.name}')">교체 확정</button>
-          ` : ''}
-        </div>
-      `).join('');
+      
+      container.innerHTML = data.map(s => {
+        // 모든 카테고리 정보를 상세하게 표시
+        const details = Object.entries(s)
+          .map(([k, v]) => `<div class="detail-info"><b>${k}:</b> ${v}</div>`).join('');
+
+        return `
+          <div class="student-info-card">
+            <div class="student-header"><b>${s.이름 || '미기입'}</b> <span>${s.포인트 || 0} pt</span></div>
+            <div style="margin-bottom:10px;">${details}</div>
+            ${type === 'point' ? `
+              <div class="point-grid">
+                <button class="btn btn-success" onclick="updatePt('${s.ID}', 100)">+100</button>
+                <button class="btn btn-success" onclick="updatePt('${s.ID}', 500)">+500</button>
+                <button class="btn btn-primary" onclick="updatePt('${s.ID}', prompt('포인트 입력'))">직접</button>
+              </div>` : ''}
+            ${type === 'card' ? `
+              <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
+              <button class="btn btn-danger" onclick="execCardChange('${s.ID}', '${s.이름}')">교체 확정</button>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    async function registerStudent() {
+      const fields = {};
+      currentHeaders.forEach(h => {
+        const el = document.getElementById(`field-${h}`);
+        if(el) fields[h] = el.value;
+      });
+      const res = await callApi({ action: 'add', fields: fields });
+      if(res && res.success) { alert("등록 완료"); showPage('checkin'); }
     }
 
     async function updatePt(id, amt) {
       if(!amt) return;
       const res = await callApi({ action: 'updatePoint', id: id, amount: amt });
-      if(res.success) { alert("지급 완료"); findStudent('point'); }
+      if(res.success) { alert("완료"); findStudent('point'); }
     }
 
     async function execCardChange(oldId, name) {
@@ -262,32 +300,25 @@
       document.getElementById('manual-id').value = "";
     }
 
-    async function registerStudent() {
-      const res = await callApi({ 
-        action: 'add', 
-        id: document.getElementById('add-id').value, 
-        name: document.getElementById('add-name').value, 
-        phone: document.getElementById('add-phone').value 
-      });
-      if(res) { alert(res.message); showPage('checkin'); }
-    }
-
     async function saveSettings() {
       localStorage.setItem('GAS_URL', document.getElementById('cfg-url').value);
       const res = await callApi({ action: 'initSheet', pw: document.getElementById('cfg-pw').value });
-      if(res) alert("연결 성공!");
+      if(res) { alert("연결 성공!"); refreshSchema(); }
     }
 
     window.onload = () => {
       const url = localStorage.getItem('GAS_URL');
-      if(url) document.getElementById('cfg-url').value = url;
+      if(url) {
+        document.getElementById('cfg-url').value = url;
+        refreshSchema();
+      }
       isAdmin = localStorage.getItem('IS_ADMIN_ACTIVE') === 'true';
       updateAdminUI();
       initFocusGuard();
       focusNfc();
       setInterval(focusNfc, 2000);
     };
-    
+
     document.body.onclick = (e) => {
       if(e.target.tagName !== 'INPUT') { isUserTyping = false; focusNfc(); }
     };
