@@ -5,38 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>도장 NFC 관리 시스템</title>
   <style>
-    :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
-    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; overflow-x: hidden; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    #mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
-    #mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
-    .admin-lock-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
-    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
-    .nav::-webkit-scrollbar { display: none; }
-    .nav button { flex: none; min-width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
-    .nav button.active { background: var(--primary); color: white; }
-    .admin-only { display: none; }
-    .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease; }
+    :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+    .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     .page.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
-    input:focus { border-color: var(--primary); outline: none; }
     .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
     .btn-primary { background: var(--primary); color: white; }
-    .btn-success { background: var(--success); color: white; }
     #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
     .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .admin-only { display: none; }
+    #mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
+    .nav button { flex: none; min-width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+    .nav button.active { background: var(--primary); color: white; }
     #nfc-bridge { position: absolute; left: -9999px; }
   </style>
 </head>
 <body>
 
-  <div id="loader"><div class="spinner"></div><p style="margin-top:15px; color:white;">데이터 동기화 중...</p></div>
+  <div id="loader"><div class="spinner"></div><p style="margin-top:15px; color:white;">동기화 중...</p></div>
 
   <div class="header">
     <div><span id="mode-status">● 학생 모드</span></div>
-    <button class="admin-lock-btn" onclick="toggleAdmin()">🔒</button>
+    <button style="background:var(--card); border:none; color:white; padding:10px; border-radius:10px;" onclick="toggleAdmin()">🔒</button>
   </div>
 
   <div class="nav">
@@ -45,9 +39,20 @@
     <button onclick="showPage('settings')" id="nav-settings" class="admin-only">설정</button>
   </div>
 
+  <div id="page-settings" class="page">
+    <h2 style="margin-top:0">⚙️ 초기 시스템 연결</h2>
+    <p style="font-size:0.85rem; color:var(--muted); line-height:1.6;">
+      구글 앱 스크립트 배포 URL과 관리자 비밀번호를 입력하세요.<br>
+      이미 사용 중인 시트라면 기존 비밀번호를 입력해야 연결됩니다.
+    </p>
+    <input type="text" id="cfg-url" placeholder="구글 앱 스크립트 URL">
+    <input type="password" id="cfg-pw" placeholder="관리자 비밀번호 (4자리 이상)">
+    <button class="btn btn-primary" onclick="setupSystem()">연결 및 시작하기</button>
+  </div>
+
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
-      <h2 style="margin-top:0">📡 NFC 카드를 태그하세요</h2>
+      <h2>📡 NFC 태그하세요</h2>
       <input type="tel" id="manual-id" placeholder="ID 입력" style="text-align:center; font-size:1.5rem;">
       <button class="btn btn-primary" onclick="doCheckin()">수동 출석</button>
     </div>
@@ -56,22 +61,7 @@
   <div id="page-add" class="page">
     <h2>👤 신규 학생 등록</h2>
     <div id="dynamic-fields"></div>
-    <button class="btn btn-success" onclick="registerStudent()">등록 완료</button>
-  </div>
-
-  <div id="page-settings" class="page">
-    <h2>⚙️ 시스템 설정</h2>
-    <div style="background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid var(--primary); margin-bottom: 20px;">
-      <h4 style="margin:0 0 10px 0; color:var(--primary);">🔗 구글 시트 연결</h4>
-      <p style="font-size:0.8rem; color:var(--muted)">앱 스크립트 배포 URL을 입력하고 연결하세요.</p>
-      <input type="text" id="cfg-url" placeholder="https://script.google.com/...">
-      <button class="btn btn-primary" onclick="setupSystem()">연결 및 시작하기</button>
-    </div>
-    <div style="padding:15px; background: #1e293b; border-radius:12px; border: 1px solid var(--accent);">
-      <h4 style="margin:0 0 10px 0; color:var(--accent);">🔑 공통 비밀번호 변경</h4>
-      <input type="password" id="new-pw" placeholder="새 비밀번호 입력">
-      <button class="btn btn-success" style="background:var(--accent)" onclick="changeGlobalPw()">비밀번호 변경 저장</button>
-    </div>
+    <button class="btn btn-primary" style="background:var(--success)" onclick="registerStudent()">등록 완료</button>
   </div>
 
   <input type="text" id="nfc-bridge" inputmode="none">
@@ -81,12 +71,10 @@
     let currentSchema = [];
     const nfcBridge = document.getElementById('nfc-bridge');
 
-    // [자연스러운 플로우 1] 페이지 로드 시 URL 체크
     window.onload = () => {
       const savedUrl = localStorage.getItem('GAS_URL');
       if (!savedUrl) {
         showPage('settings');
-        alert("처음이시군요! 구글 시트 URL을 먼저 연결해주세요.");
       } else {
         document.getElementById('cfg-url').value = savedUrl;
         showPage('checkin');
@@ -94,35 +82,38 @@
       nfcBridge.focus();
     };
 
-    // [자연스러운 플로우 2] 연결 성공 시 자동 이동
     async function setupSystem() {
       const url = document.getElementById('cfg-url').value.trim();
-      if(!url) return alert("URL을 입력하세요.");
+      const pw = document.getElementById('cfg-pw').value.trim();
+      
+      if(!url || pw.length < 4) return alert("URL과 4자리 이상의 비밀번호를 입력하세요.");
+      
       localStorage.setItem('GAS_URL', url);
-      const res = await callApi({ action: 'initSheet' });
-      if(res && res.status === "success") {
+      const res = await callApi({ action: 'initSheet', pw: pw });
+      
+      if (res && res.status === "success") {
         alert(res.message);
-        showPage('checkin'); // 성공 시 즉시 서비스 화면으로 이동
+        showPage('checkin');
       } else {
+        if(res) alert(res.message);
         localStorage.removeItem('GAS_URL');
       }
     }
 
-    // [관리자 인증] 시트 비번 공유
     async function toggleAdmin() {
       if (!isAdmin) {
-        const pw = prompt("공통 관리자 비밀번호를 입력하세요.");
+        const pw = prompt("관리자 비밀번호를 입력하세요.");
         if (!pw) return;
         const res = await callApi({ action: 'verifyPw', pw: pw });
         if (res && res.success) { isAdmin = true; updateAdminUI(); }
-        else { alert("비밀번호 오류"); }
+        else { alert("비밀번호가 일치하지 않습니다."); }
       } else { isAdmin = false; updateAdminUI(); }
     }
 
     function updateAdminUI() {
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
       document.getElementById('mode-status').innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
-      document.getElementById('mode-status').classList.toggle('admin-active', isAdmin);
+      if(!isAdmin) showPage('checkin');
     }
 
     async function doCheckin() {
@@ -167,13 +158,8 @@
       try {
         const response = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         return await response.json();
-      } catch (e) { 
-        alert("연결 오류: URL 배포 설정을 확인하세요."); 
-        return null; 
-      } finally { 
-        document.getElementById('loader').style.display = 'none'; 
-        nfcBridge.focus(); 
-      }
+      } catch (e) { alert("연결 실패: URL을 확인하세요."); return null; }
+      finally { document.getElementById('loader').style.display = 'none'; nfcBridge.focus(); }
     }
 
     function showPage(p) {
@@ -196,13 +182,6 @@
         nfcBridge.value = "";
       }
     });
-
-    async function changeGlobalPw() {
-      const newPw = document.getElementById('new-pw').value;
-      if(newPw.length < 4) return alert("4자리 이상 입력하세요.");
-      const res = await callApi({ action: 'changePw', newPw: newPw });
-      if(res && res.success) alert("전체 기기 비밀번호 변경 완료");
-    }
   </script>
 </body>
 </html>
