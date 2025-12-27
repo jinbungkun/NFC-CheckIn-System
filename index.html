@@ -271,40 +271,66 @@
     }
 
     function renderResults(data, type) {
-      const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-      const container = document.getElementById(containerId);
-      
-      if (!data || data.length === 0) {
-        container.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
-        return;
-      }
+  const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+  const container = document.getElementById(containerId);
+  
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
+    return;
+  }
 
-      container.innerHTML = data.map(s => {
-        const infoLines = currentHeaders
-          .map(header => {
-            const val = s[header] !== undefined ? s[header] : "";
-            return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
-          }).join('');
-
-        return `
-          <div class="student-info-card">
-            <div class="student-header">
-              <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름'] || '미기입'}</span>
-              <span style="color:var(--accent); font-weight:bold;">${s['포인트'] || 0} pt</span>
-            </div>
-            <div style="margin: 10px 0;">${infoLines}</div>
-            ${type === 'point' ? `
-              <div class="point-grid">
-                <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100)">+100</button>
-                <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500)">+500</button>
-                <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'))">직접</button>
-              </div>` : ''}
-            ${type === 'card' ? `
-              <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
-              <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
-          </div>`;
+  container.innerHTML = data.map(s => {
+    const infoLines = currentHeaders
+      .map(header => {
+        let val = s[header] !== undefined ? s[header] : "";
+        
+        // [수정된 부분] 날짜 형식 변환 로직 (마지막출석 또는 등록일)
+        if ((header === "마지막출석" || header === "등록일") && val) {
+          try {
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+              const Y = d.getFullYear();
+              const M = String(d.getMonth() + 1).padStart(2, '0');
+              const D = String(d.getDate()).padStart(2, '0');
+              const h = String(d.getHours()).padStart(2, '0');
+              const m = String(d.getMinutes()).padStart(2, '0');
+              
+              // 마지막출석은 시간까지, 등록일은 날짜까지만 표시
+              val = header === "마지막출석" ? `${Y}-${M}-${D} ${h}:${m}` : `${Y}-${M}-${D}`;
+            }
+          } catch (e) {
+            console.error("날짜 변환 오류:", e);
+          }
+        }
+        
+        return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
       }).join('');
-    }
+
+    return `
+      <div class="student-info-card">
+        <div class="student-header">
+          <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름'] || '미기입'}</span>
+          <span style="color:var(--accent); font-weight:bold;">${s['포인트'] || 0} pt</span>
+        </div>
+        <div style="margin: 10px 0;">${infoLines}</div>
+        
+        ${type === 'search' ? `
+          <button class="btn btn-success" onclick="doDirectCheckin('${s['ID']}')">이 학생 출석하기</button>
+        ` : ''}
+
+        ${type === 'point' ? `
+          <div class="point-grid">
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100)">+100</button>
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500)">+500</button>
+            <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'))">직접</button>
+          </div>` : ''}
+        
+        ${type === 'card' ? `
+          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
+          <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
+      </div>`;
+  }).join('');
+}
 
     async function registerStudent() {
       const idVal = document.getElementById('field-ID').value;
