@@ -199,20 +199,33 @@
     });
 
     function processNfc(val) {
-      const active = document.querySelector('.page.active').id;
-      if(active === 'page-checkin') {
-        document.getElementById('manual-id').value = val;
-        doCheckin();
-      } else if(isAdmin) {
-        if(active === 'page-add') {
-          const idInp = document.getElementById('field-ID');
-          if(idInp) idInp.value = val;
-        } else if(active === 'page-card') {
-          const newInp = document.getElementById('new-card-input');
-          if(newInp) newInp.value = val;
-          else findByNfc(val, 'card');
-        } else if(active === 'page-point') findByNfc(val, 'point');
+     const activePage = document.querySelector('.page.active').id;
+  
+  if (activePage === 'page-checkin') {
+    document.getElementById('manual-id').value = val;
+    doCheckin();
+  } 
+  else if (isAdmin) {
+    if (activePage === 'page-add') {
+      const idInp = document.getElementById('field-ID');
+      if (idInp) idInp.value = val;
+    } 
+    else if (activePage === 'page-search') {
+      // 조회 페이지에서 카드 태그 시 즉시 검색 실행
+      findByNfc(val, 'search');
+    }
+    else if (activePage === 'page-point') {
+      findByNfc(val, 'point');
+    } 
+    else if (activePage === 'page-card') {
+      const newInp = document.getElementById('new-card-input');
+      if (newInp) {
+        newInp.value = val;
+      } else {
+        findByNfc(val, 'card');
       }
+    }
+  }
     }
 
     async function callApi(data) {
@@ -235,10 +248,16 @@
     }
 
     async function findByNfc(id, type) {
-      const res = await callApi({ action: 'searchName', name: '' });
-      const student = res.data.find(s => String(s.ID) === String(id));
-      if(student) renderResults([student], type);
-      else alert("등록되지 않은 카드");
+      const res = await callApi({ action: 'searchName', name: '' }); // 전체 데이터 호출
+  if (res && res.data) {
+    // ID가 일치하는 학생 필터링
+    const student = res.data.find(s => String(s['ID']) === String(id));
+    if (student) {
+      renderResults([student], type);
+    } else {
+      alert("등록되지 않은 카드입니다. (ID: " + id + ")");
+    }
+  }
     }
 
     function renderResults(data, type) {
@@ -246,25 +265,44 @@
       const container = document.getElementById(containerId);
       
       container.innerHTML = data.map(s => {
-        // 모든 카테고리 정보를 상세하게 표시
-        const details = Object.entries(s)
-          .map(([k, v]) => `<div class="detail-info"><b>${k}:</b> ${v}</div>`).join('');
+       const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+  const container = document.getElementById(containerId);
+  
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>검색 결과가 없습니다.</p>";
+    return;
+  }
 
-        return `
-          <div class="student-info-card">
-            <div class="student-header"><b>${s.이름 || '미기입'}</b> <span>${s.포인트 || 0} pt</span></div>
-            <div style="margin-bottom:10px;">${details}</div>
-            ${type === 'point' ? `
-              <div class="point-grid">
-                <button class="btn btn-success" onclick="updatePt('${s.ID}', 100)">+100</button>
-                <button class="btn btn-success" onclick="updatePt('${s.ID}', 500)">+500</button>
-                <button class="btn btn-primary" onclick="updatePt('${s.ID}', prompt('포인트 입력'))">직접</button>
-              </div>` : ''}
-            ${type === 'card' ? `
-              <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
-              <button class="btn btn-danger" onclick="execCardChange('${s.ID}', '${s.이름}')">교체 확정</button>` : ''}
-          </div>`;
-      }).join('');
+  container.innerHTML = data.map(s => {
+    // currentHeaders(시트의 헤더 순서)를 기준으로 데이터를 생성
+    const infoLines = currentHeaders
+      .map(header => {
+        const val = s[header] !== undefined ? s[header] : "";
+        return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
+      })
+      .join('');
+
+    return `
+      <div class="student-info-card">
+        <div class="student-header">
+          <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름'] || '미기입'}</span>
+          <span style="color:var(--accent); font-weight:bold;">${s['포인트'] || 0} pt</span>
+        </div>
+        <div style="margin: 10px 0;">${infoLines}</div>
+        
+        ${type === 'point' ? `
+          <div class="point-grid">
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100)">+100</button>
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500)">+500</button>
+            <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'))">직접</button>
+          </div>` : ''}
+        
+        ${type === 'card' ? `
+          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
+          <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
+      </div>`;
+  }).join('');
+}
     }
 
     async function registerStudent() {
