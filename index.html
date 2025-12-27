@@ -11,6 +11,12 @@
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     #mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
     #mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
+    
+    /* 포커스 상태창 스타일 */
+    #focus-indicator { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; transition: all 0.3s; }
+    .focus-nfc { background: var(--success); color: white; }
+    .focus-typing { background: var(--accent); color: white; }
+
     .admin-lock-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
 
     .nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
@@ -46,7 +52,10 @@
   <div id="loader"><p style="color:white;">처리 중...</p></div>
 
   <div class="header">
-    <div><span id="mode-status">● 학생 모드</span></div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span id="mode-status">● 학생 모드</span>
+      <span id="focus-indicator"></span>
+    </div>
     <button class="admin-lock-btn" onclick="toggleAdmin()">🔒</button>
   </div>
 
@@ -112,6 +121,18 @@
     let currentHeaders = [];
     const nfcBridge = document.getElementById('nfc-bridge');
 
+    // [상태창] 포커스 UI 업데이트
+    function updateFocusUI() {
+      const indicator = document.getElementById('focus-indicator');
+      if (isUserTyping) {
+        indicator.innerText = "⌨️ 입력 중";
+        indicator.className = "focus-typing";
+      } else {
+        indicator.innerText = "📡 리더기 대기";
+        indicator.className = "focus-nfc";
+      }
+    }
+
     function focusNfc() {
       if (isUserTyping || isApiLoading) return;
       if (document.activeElement.tagName !== 'INPUT') {
@@ -122,24 +143,28 @@
     function initFocusGuard() {
       document.querySelectorAll('input').forEach(el => {
         if (el.id === 'nfc-bridge') return;
-        el.addEventListener('focus', () => { isUserTyping = true; });
+        el.addEventListener('focus', () => { isUserTyping = true; updateFocusUI(); });
         el.addEventListener('blur', () => { 
-          setTimeout(() => { isUserTyping = false; focusNfc(); }, 500); 
+          setTimeout(() => { isUserTyping = false; updateFocusUI(); focusNfc(); }, 500); 
         });
       });
     }
 
-    async function refreshSchema() {
+    async function refreshSchema(force = false) {
+      // 로딩 최적화: 이미 헤더가 있다면 강제(force)가 아닐 시 호출 생략
+      if (!force && currentHeaders.length > 0) return renderAddFields();
+
       const res = await callApi({ action: 'getSchema' });
       if (!res || !res.headers) return;
       currentHeaders = res.headers;
-      
+      renderAddFields();
+    }
+
+    function renderAddFields() {
       const container = document.getElementById('dynamic-add-fields');
       container.innerHTML = "";
-      
       currentHeaders.forEach(header => {
         if (['포인트', '등록일', '마지막출석'].includes(header)) return;
-        
         const input = document.createElement('input');
         input.placeholder = header;
         input.id = `field-${header}`;
@@ -184,6 +209,7 @@
       document.querySelectorAll('.nav button').forEach(el => el.classList.remove('active'));
       document.getElementById('nav-' + p).classList.add('active');
       isUserTyping = false;
+      updateFocusUI();
       setTimeout(focusNfc, 300);
     }
 
@@ -225,7 +251,7 @@
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         return await res.json();
       } catch (e) { return null; }
-      finally { isApiLoading = false; document.getElementById('loader').style.display = 'none'; focusNfc(); }
+      finally { isApiLoading = false; document.getElementById('loader').style.display = 'none'; updateFocusUI(); focusNfc(); }
     }
 
     async function findStudent(type) {
@@ -324,7 +350,7 @@
       const url = document.getElementById('cfg-url').value;
       localStorage.setItem('GAS_URL', url);
       const res = await callApi({ action: 'initSheet', pw: document.getElementById('cfg-pw').value });
-      if(res) { alert("연결 성공!"); refreshSchema(); }
+      if(res) { alert("연결 성공!"); refreshSchema(true); }
     }
 
     window.onload = () => {
@@ -336,12 +362,13 @@
       isAdmin = localStorage.getItem('IS_ADMIN_ACTIVE') === 'true';
       updateAdminUI();
       initFocusGuard();
+      updateFocusUI();
       focusNfc();
       setInterval(focusNfc, 2000);
     };
 
     document.body.onclick = (e) => {
-      if(e.target.tagName !== 'INPUT') { isUserTyping = false; focusNfc(); }
+      if(e.target.tagName !== 'INPUT') { isUserTyping = false; updateFocusUI(); focusNfc(); }
     };
   </script>
 </body>
