@@ -1,0 +1,44 @@
+:root { 
+  --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; 
+  --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; 
+}
+
+body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+
+#mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
+#mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
+
+#focus-indicator { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; transition: all 0.3s; }
+.focus-nfc { background: var(--success); color: white; }
+.focus-typing { background: var(--accent); color: white; }
+
+.admin-lock-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
+
+.nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
+.nav::-webkit-scrollbar { display: none; }
+.nav button { flex: none; width: 75px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+.nav button.active { background: var(--primary); color: white; }
+
+.admin-only-btn { display: none; } 
+
+.page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.page.active { display: block !important; }
+
+input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
+input:focus { border-color: var(--primary); outline: none; background: #000; }
+input[readonly] { background: #1e293b; color: var(--muted); cursor: not-allowed; }
+
+.btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 8px; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-success { background: var(--success); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+
+.student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; }
+.student-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #475569; padding-bottom: 5px; }
+.point-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+#loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
+#nfc-bridge { position: absolute; left: -9999px; opacity: 0; }
+.detail-info { font-size: 0.85rem; color: var(--muted); margin: 2px 0; }
