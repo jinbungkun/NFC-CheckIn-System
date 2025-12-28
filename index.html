@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>도장 통합 관리 시스템</title>
   <style>
-    /* 기존 스타일 유지 */
     :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -21,8 +20,7 @@
     .nav button.active { background: var(--primary); color: white; }
     .admin-only-btn { display: none; } 
     .page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-    .page.active { display: block !important; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .page.active { display: block !important; }
     input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
     input:focus { border-color: var(--primary); outline: none; background: #000; }
     input[readonly] { background: #1e293b; color: var(--muted); cursor: not-allowed; }
@@ -109,14 +107,14 @@
     let isUserTyping = false;
     let isApiLoading = false;
     let currentHeaders = [];
-    let quickMap = {}; // [개선] 출석용 경량 데이터 캐시
+    let quickMap = {};
     const nfcBridge = document.getElementById('nfc-bridge');
 
-    // [개선] 초기 명단 로드 (속도 향상)
     async function initQuickMap() {
       const res = await callApi({ action: 'getQuickMap' }, false);
       if (res && res.success) {
         quickMap = res.data;
+        console.log("캐시 로드 완료");
       }
     }
 
@@ -148,31 +146,74 @@
       });
     }
 
-    async function refreshSchema(force = false) {
-      if (!force && currentHeaders.length > 0) return renderAddFields();
-      const res = await callApi({ action: 'getSchema' });
-      if (!res || !res.headers) return;
-      currentHeaders = res.headers;
-      renderAddFields();
-    }
-
-    function renderAddFields() {
-      const container = document.getElementById('dynamic-add-fields');
-      container.innerHTML = "";
-      currentHeaders.forEach(header => {
-        if (['포인트', '등록일', '마지막출석'].includes(header)) return;
-        const input = document.createElement('input');
-        input.placeholder = header;
-        input.id = `field-${header}`;
-        if (header === 'ID') {
-          input.readOnly = true;
-          input.placeholder = "ID (카드를 태그하세요)";
+    async function callApi(data, showLoader = true) {
+      const url = localStorage.getItem('GAS_URL');
+      if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
+      if (showLoader) {
+        isApiLoading = true;
+        document.getElementById('loader').style.display = 'flex';
+      }
+      try {
+        const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+        return await res.json();
+      } catch (e) { return null; }
+      finally { 
+        if (showLoader) {
+          isApiLoading = false; 
+          document.getElementById('loader').style.display = 'none'; 
+          updateFocusUI(); 
+          focusNfc(); 
         }
-        container.appendChild(input);
-      });
-      initFocusGuard();
+      }
     }
 
+    // [최적화 핵심] 출석 로직
+    function doCheckin() {
+      const input = document.getElementById('manual-id');
+      const id = input.value.trim();
+      if(!id) return;
+
+      // 1. 즉시 입력창 비우기 (체감 속도 핵심)
+      input.value = ""; 
+
+      const studentName = quickMap[id];
+      if (studentName) {
+        // 2. 캐시가 있다면 0.1초만에 이름 표시 (낙관적 UI)
+        renderCheckinUI(studentName, "출석 처리 중... 🚀", "#3b82f6");
+        
+        // 3. 백그라운드 서버 통신 (로더 없음)
+        callApi({ action: 'checkin', id: id }, false).then(res => {
+          if (res && res.success) {
+            renderCheckinUI(studentName, "출석 완료! ✅", "var(--success)");
+          } else if (res && res.status === "already") {
+            renderCheckinUI(studentName, "이미 출석함 ⚠️", "var(--accent)");
+          } else {
+            renderCheckinUI(studentName, "전송 실패 ❌", "var(--danger)");
+          }
+        });
+      } else {
+        // 캐시에 없을 때만 서버 조회 대기
+        renderCheckinUI("조회 중", "명단 확인 중...", "var(--muted)");
+        callApi({ action: 'checkin', id: id }, true).then(res => {
+          if (res && res.success) {
+            renderCheckinUI(res.name, "출석 성공!", "var(--success)");
+            quickMap[id] = res.name;
+          } else {
+            renderCheckinUI("실패", res.message || "미등록 정보", "var(--danger)");
+          }
+        });
+      }
+    }
+
+    function renderCheckinUI(name, msg, color) {
+      document.getElementById('checkin-result').innerHTML = `
+        <div class="student-info-card" style="text-align:center; border: 2px solid ${color};">
+          <h3 style="color:${color}; margin: 5px 0;">${name}</h3>
+          <p style="margin: 5px 0; font-weight: bold;">${msg}</p>
+        </div>`;
+    }
+
+    // 이하 기존 관리자 기능 유지
     async function toggleAdmin() {
       if (!isAdmin) {
         const pw = prompt("관리자 비밀번호");
@@ -238,29 +279,28 @@
       }
     }
 
-    // [개선] 로더 표시 여부 옵션 추가
-    async function callApi(data, showLoader = true) {
-      const url = localStorage.getItem('GAS_URL');
-      if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
-      if (showLoader) {
-        isApiLoading = true;
-        document.getElementById('loader').style.display = 'flex';
-      }
-      try {
-        const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
-        return await res.json();
-      } catch (e) { return null; }
-      finally { 
-        if (showLoader) {
-          isApiLoading = false; 
-          document.getElementById('loader').style.display = 'none'; 
-          updateFocusUI(); 
-          focusNfc(); 
-        }
-      }
+    async function refreshSchema(force = false) {
+      if (!force && currentHeaders.length > 0) return renderAddFields();
+      const res = await callApi({ action: 'getSchema' });
+      if (!res || !res.headers) return;
+      currentHeaders = res.headers;
+      renderAddFields();
     }
 
-    // [조회 무결성] 조회 기능은 항상 실시간 서버 데이터 호출 (showLoader=true)
+    function renderAddFields() {
+      const container = document.getElementById('dynamic-add-fields');
+      container.innerHTML = "";
+      currentHeaders.forEach(header => {
+        if (['포인트', '등록일', '마지막출석'].includes(header)) return;
+        const input = document.createElement('input');
+        input.placeholder = header;
+        input.id = `field-${header}`;
+        if (header === 'ID') { input.readOnly = true; input.placeholder = "ID (카드를 태그하세요)"; }
+        container.appendChild(input);
+      });
+      initFocusGuard();
+    }
+
     async function findStudent(type) {
       const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
       const nameInput = document.getElementById(inputId).value;
@@ -288,17 +328,15 @@
         const infoLines = currentHeaders.map(header => {
             let val = s[header] !== undefined ? s[header] : "";
             if ((header === "마지막출석" || header === "등록일") && val) {
-              try {
-                const d = new Date(val);
-                if (!isNaN(d.getTime())) {
-                  const Y = d.getFullYear();
-                  const M = String(d.getMonth() + 1).padStart(2, '0');
-                  const D = String(d.getDate()).padStart(2, '0');
-                  const h = String(d.getHours()).padStart(2, '0');
-                  const m = String(d.getMinutes()).padStart(2, '0');
-                  val = header === "마지막출석" ? `${Y}-${M}-${D} ${h}:${m}` : `${Y}-${M}-${D}`;
-                }
-              } catch (e) {}
+              const d = new Date(val);
+              if (!isNaN(d.getTime())) {
+                const Y = d.getFullYear();
+                const M = String(d.getMonth() + 1).padStart(2, '0');
+                const D = String(d.getDate()).padStart(2, '0');
+                const h = String(d.getHours()).padStart(2, '0');
+                const m = String(d.getMinutes()).padStart(2, '0');
+                val = header === "마지막출석" ? `${Y}-${M}-${D} ${h}:${m}` : `${Y}-${M}-${D}`;
+              }
             }
             return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
           }).join('');
@@ -334,11 +372,7 @@
         if(el) fields[h] = el.value;
       });
       const res = await callApi({ action: 'add', fields: fields });
-      if(res && res.success) { 
-        alert("등록 완료"); 
-        initQuickMap(); // 캐시 갱신
-        showPage('checkin'); 
-      }
+      if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
     }
 
     async function updatePt(id, amt) {
@@ -351,55 +385,7 @@
       const newId = document.getElementById('new-card-input').value;
       if(!newId) return alert("새 카드를 태그하세요.");
       const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId });
-      if(res.success) { 
-        alert("교체 완료"); 
-        initQuickMap(); // 캐시 갱신
-        showPage('checkin'); 
-      }
-    }
-
-    // [개선] 낙관적 UI 출석 처리 (성능 향상)
-    function doCheckin() {
-      const input = document.getElementById('manual-id');
-      const id = input.value.trim();
-      if(!id) return;
-
-      const studentName = quickMap[id];
-      if (studentName) {
-        // 즉시 화면 표시 (성공 가정)
-        renderCheckinUI(studentName, "처리 중...", "#3b82f6");
-        
-        // 백그라운드 서버 전송 (로더 없음)
-        callApi({ action: 'checkin', id: id }, false).then(res => {
-          if (res && res.success) {
-            renderCheckinUI(studentName, res.message || "출석 성공!", "#10b981");
-          } else if (res && res.status === "already") {
-            renderCheckinUI(studentName, "이미 오늘 출석함", "#f59e0b");
-          } else {
-            renderCheckinUI(studentName, "서버 전송 실패", "#ef4444");
-          }
-        });
-      } else {
-        // 캐시에 없을 때만 로더와 함께 서버 확인
-        renderCheckinUI("조회 중", "정보를 불러오고 있습니다...", "#94a3b8");
-        callApi({ action: 'checkin', id: id }, true).then(res => {
-          if (res && res.success) {
-            renderCheckinUI(res.name, "출석 성공!", "#10b981");
-            quickMap[id] = res.name; // 캐시 업데이트
-          } else {
-            renderCheckinUI("실패", res.message || "미등록 정보", "#ef4444");
-          }
-        });
-      }
-      input.value = "";
-    }
-
-    function renderCheckinUI(name, msg, color) {
-      document.getElementById('checkin-result').innerHTML = `
-        <div class="student-info-card" style="text-align:center; border: 2px solid ${color};">
-          <h3 style="color:${color}">${name}</h3>
-          <p>${msg}</p>
-        </div>`;
+      if(res.success) { alert("교체 완료"); initQuickMap(); showPage('checkin'); }
     }
 
     async function saveSettings() {
@@ -414,7 +400,7 @@
       if(url) {
         document.getElementById('cfg-url').value = url;
         refreshSchema();
-        initQuickMap(); // 시작 시 경량 데이터 로드
+        initQuickMap();
       }
       isAdmin = localStorage.getItem('IS_ADMIN_ACTIVE') === 'true';
       updateAdminUI();
