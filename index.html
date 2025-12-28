@@ -169,41 +169,56 @@
 
     // [최적화 핵심] 출석 로직
     function doCheckin() {
-      const input = document.getElementById('manual-id');
-      const id = input.value.trim();
-      if(!id) return;
+  const input = document.getElementById('manual-id');
+  const id = input.value.trim();
+  if(!id) return;
 
-      // 1. 즉시 입력창 비우기 (체감 속도 핵심)
-      input.value = ""; 
+  // 1. 즉시 입력창 비우기
+  input.value = ""; 
 
-      const studentName = quickMap[id];
-      if (studentName) {
-        // 2. 캐시가 있다면 0.1초만에 이름 표시 (낙관적 UI)
-        renderCheckinUI(studentName, "출석 처리 중... 🚀", "#3b82f6");
-        
-        // 3. 백그라운드 서버 통신 (로더 없음)
-        callApi({ action: 'checkin', id: id }, false).then(res => {
-          if (res && res.success) {
-            renderCheckinUI(studentName, "출석 완료! ✅", "var(--success)");
-          } else if (res && res.status === "already") {
-            renderCheckinUI(studentName, "이미 출석함 ⚠️", "var(--accent)");
-          } else {
-            renderCheckinUI(studentName, "전송 실패 ❌", "var(--danger)");
-          }
-        });
-      } else {
-        // 캐시에 없을 때만 서버 조회 대기
-        renderCheckinUI("조회 중", "명단 확인 중...", "var(--muted)");
-        callApi({ action: 'checkin', id: id }, true).then(res => {
-          if (res && res.success) {
-            renderCheckinUI(res.name, "출석 성공!", "var(--success)");
-            quickMap[id] = res.name;
-          } else {
-            renderCheckinUI("실패", res.message || "미등록 정보", "var(--danger)");
-          }
-        });
-      }
+  const student = quickMap[id]; 
+  
+  if (student) {
+    // [추가] 오늘 날짜 구하기 (YYYY-MM-DD 형식)
+    const today = new Date().toLocaleDateString('sv-SE'); // '2025-12-28' 형식 출력
+
+    // 2. 로컬 데이터로 즉시 중복 체크
+    if (student.lastDate === today) {
+      renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
+      return; // 서버 통신조차 하지 않고 여기서 종료
     }
+
+    // 3. 낙관적 UI: 즉시 성공 표시 및 로컬 데이터 갱신
+    renderCheckinUI(student.name, "출석 완료! ✅", "var(--success)");
+    student.lastDate = today; // 다음 번 중복 체크를 위해 메모리 업데이트
+
+    // 4. 백그라운드 서버 통신 (기록용)
+    callApi({ action: 'checkin', id: id }, false).then(res => {
+      if (!res || !res.success) {
+        // 진짜 에러가 났을 때만 로컬 데이터 롤백 및 알림
+        if (res && res.status !== "already") {
+          student.lastDate = ""; 
+          renderCheckinUI(student.name, "서버 저장 실패 ❌", "var(--danger)");
+        }
+      }
+    });
+  } else {
+    // 캐시에 없는 신규 ID 처리
+    renderCheckinUI("조회 중", "명단 확인 중...", "var(--muted)");
+    callApi({ action: 'checkin', id: id }, true).then(res => {
+      if (res && res.success) {
+        renderCheckinUI(res.name, "출석 성공!", "var(--success)");
+        // 새로운 학생 캐시에 추가
+        quickMap[id] = { 
+          name: res.name, 
+          lastDate: new Date().toLocaleDateString('sv-SE') 
+        };
+      } else {
+        renderCheckinUI("실패", res.message || "미등록 정보", "var(--danger)");
+      }
+    });
+  }
+}
 
     function renderCheckinUI(name, msg, color) {
       document.getElementById('checkin-result').innerHTML = `
