@@ -374,15 +374,57 @@ function renderAddFields() {
   initFocusGuard();
 }
 
-// [UI] 페이지 이동
+// [UI] 페이지 이동 (초기화 로직 통합)
 function showPage(p) {
+  // 1. 페이지 및 네비게이션 활성화 상태 변경
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.getElementById('page-' + p).classList.add('active');
   document.querySelectorAll('.nav button').forEach(el => el.classList.remove('active'));
-  document.getElementById('nav-' + p).classList.add('active');
+  const navBtn = document.getElementById('nav-' + p);
+  if (navBtn) navBtn.classList.add('active');
+
+  // 2. 입력 데이터 및 UI 초기화
+  resetPageData(p);
+
+  // 3. 포커스 관리
   isUserTyping = false;
   updateFocusUI();
   setTimeout(focusNfc, 300);
+}
+
+// [추가] 페이지 전환 시 데이터 초기화 상세 로직
+function resetPageData(activePage) {
+  // 1) 모든 일반 입력창 비우기 (NFC 브릿지 제외)
+  document.querySelectorAll('input').forEach(input => {
+    if (input.id !== 'nfc-bridge' && input.type !== 'button') {
+      input.value = "";
+    }
+  });
+
+  // 2) 출석 체크 페이지 초기화
+  if (document.getElementById('checkin-result')) {
+    document.getElementById('checkin-result').innerHTML = `
+      <div class="student-info-card" style="text-align:center; color:var(--muted); border:1px dashed var(--muted);">
+        ID를 입력하거나 카드를 태그하세요.
+      </div>`;
+  }
+
+  // 3) 정보 조회 페이지 결과 비우기
+  if (document.getElementById('search-results')) {
+    document.getElementById('search-results').innerHTML = "";
+  }
+
+  // 4) 포인트/카드 관리 페이지 타겟 영역 비우기
+  const pointTarget = document.getElementById('point-target-area');
+  if (pointTarget) pointTarget.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>학생을 검색하거나 카드를 태그하세요.</p>";
+  
+  const cardTarget = document.getElementById('card-target-area');
+  if (cardTarget) cardTarget.innerHTML = "";
+
+  // 5) 신규 등록 페이지 (필드 재구성)
+  if (activePage === 'add') {
+    renderAddFields(); // 폼을 깨끗하게 새로 그림
+  }
 }
 
 // [NFC] 리더기 입력 이벤트
