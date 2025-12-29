@@ -275,17 +275,37 @@ async function updatePt(id, amt, event) {
 
 // [관리자] 학생 추가
 async function registerStudent() {
-  const idVal = document.getElementById('field-ID').value;
-  const nameVal = document.getElementById('field-이름').value;
-  if(!idVal) return alert("카드를 태그하여 ID를 먼저 입력하세요.");
-  if(!nameVal) return alert("학생 이름을 입력하세요.");
+  const idEl = document.getElementById('field-ID');
+  const nameEl = document.getElementById('field-이름');
+  
+  if(!idEl || !idEl.value) return alert("카드를 태그하여 ID를 입력하세요.");
+  if(!nameEl || !nameEl.value) return alert("학생 이름을 입력하세요.");
+
   const fields = {};
+  // 현재 로드된 모든 헤더에 대해 입력값이 있는지 확인하여 수집
   currentHeaders.forEach(h => {
     const el = document.getElementById(`field-${h}`);
-    if(el) fields[h] = el.value;
+    if (el) {
+      fields[h] = el.value.trim();
+    }
   });
-  const res = await callApi({ action: 'add', fields: fields });
-  if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
+
+  console.log("등록 시도 데이터:", fields); // 디버깅용
+
+  const res = await callApi({ action: 'add', fields: fields }, true);
+  
+  if(res && res.success) { 
+    alert("등록 완료!"); 
+    await initQuickMap(); // 캐시 갱신
+    showPage('checkin'); 
+    // 입력창 초기화
+    currentHeaders.forEach(h => {
+      const el = document.getElementById(`field-${h}`);
+      if(el) el.value = "";
+    });
+  } else {
+    alert("등록 실패: " + (res ? res.message : "서버 응답 없음"));
+  }
 }
 
 // [관리자] 카드 교체
