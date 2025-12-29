@@ -376,71 +376,58 @@ function renderAddFields() {
 
 // [UI] 페이지 이동 및 데이터 완전 초기화
 function showPage(p) {
-  // 1. 모든 페이지 숨기기
-  document.querySelectorAll('.page').forEach(el => {
-    el.classList.remove('active');
-  });
-
-  // 2. 선택한 페이지 활성화
+  // 1. 페이지 활성화 제어
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   const targetPage = document.getElementById('page-' + p);
-  if (targetPage) {
-    targetPage.classList.add('active');
-  }
+  if (targetPage) targetPage.classList.add('active');
 
-  // 3. 네비게이션 버튼 상태 업데이트 (에러 방지를 위해 체크 추가)
+  // 2. 네비게이션 버튼 활성화 제어
   document.querySelectorAll('.nav button').forEach(btn => {
     btn.classList.remove('active');
-    // 버튼의 id가 'nav-페이지명' 형식인지 확인
-    if (btn.id === 'nav-' + p) {
-      btn.classList.add('active');
-    }
+    if (btn.id === 'nav-' + p) btn.classList.add('active');
   });
 
-  // ---------------------------------------------------
-  // [핵심] 데이터 초기화 로직 (강력한 선택자 사용)
-  // ---------------------------------------------------
-  
-  // 1) 모든 input 값 비우기 (NFC 브릿지 제외)
-  const allInputs = document.querySelectorAll('input');
-  allInputs.forEach(input => {
-    if (input.id !== 'nfc-bridge' && input.id !== 'cfg-url' && input.type !== 'button' && input.type !== 'submit') {
+  // 3. 입력 필드 초기화 (중요 설정값 및 특수 필드 제외)
+  document.querySelectorAll('input').forEach(input => {
+    // 제외 목록: NFC 브릿지, GAS URL, 설정 비밀번호, 각종 버튼
+    const skipIds = ['nfc-bridge', 'cfg-url', 'cfg-pw'];
+    if (!skipIds.includes(input.id) && input.type !== 'button' && input.type !== 'submit') {
       input.value = "";
     }
   });
 
-  // 2) 출석 체크 결과 UI 초기화
-  const checkinResult = document.getElementById('checkin-result');
-  if (checkinResult) {
-    checkinResult.innerHTML = `
-      <div class="student-info-card" style="text-align:center; color:var(--muted); border:1px dashed var(--muted); padding:20px;">
-        ID를 입력하거나 카드를 태그하세요.
-      </div>`;
+  // [보강] 설정 페이지로 이동할 때 저장된 값을 다시 확실히 뿌려줌
+  if (p === 'settings') {
+    document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
+    // 비밀번호는 보안상 다시 채우지 않거나, 필요시 localStorage에 저장된 값을 넣을 수 있습니다.
   }
 
-  // 3) 정보 조회 페이지 결과 비우기
-  const searchResults = document.getElementById('search-results');
-  if (searchResults) {
-    searchResults.innerHTML = "";
-  }
+  // 4. 각 페이지별 결과 UI 초기화
+  const resetMap = {
+    'checkin': () => {
+      const res = document.getElementById('checkin-result');
+      if (res) res.innerHTML = '<div class="student-info-card" style="text-align:center; color:var(--muted); border:1px dashed var(--muted); padding:20px;">ID를 입력하거나 카드를 태그하세요.</div>';
+    },
+    'search': () => {
+      const res = document.getElementById('search-results');
+      if (res) res.innerHTML = "";
+    },
+    'point': () => {
+      const res = document.getElementById('point-target-area');
+      if (res) res.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>학생을 검색하거나 카드를 태그하세요.</p>";
+    },
+    'card': () => {
+      const res = document.getElementById('card-target-area');
+      if (res) res.innerHTML = "";
+    },
+    'add': () => {
+      renderAddFields(); 
+    }
+  };
 
-  // 4) 포인트 관리 타겟 영역 초기화
-  const pointTarget = document.getElementById('point-target-area');
-  if (pointTarget) {
-    pointTarget.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>학생을 검색하거나 카드를 태그하세요.</p>";
-  }
+  if (resetMap[p]) resetMap[p]();
 
-  // 5) 카드 교체 영역 초기화
-  const cardTarget = document.getElementById('card-target-area');
-  if (cardTarget) {
-    cardTarget.innerHTML = "";
-  }
-
-  // 6) 관리자 등록 폼 초기화 (새로 그리기)
-  if (p === 'add') {
-    renderAddFields();
-  }
-
-  // 후속 처리
+  // 5. 후속 처리
   isUserTyping = false;
   updateFocusUI();
   setTimeout(focusNfc, 300);
