@@ -208,40 +208,46 @@ function renderAddFields() {
 }
 
 // [개선] 학생 검색 (로컬 캐시 우선 검색으로 로더 방지)
-async function findStudent(type) {
+function findStudent(type) {
   const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
   const query = document.getElementById(inputId).value.trim();
-  
   if (!query) return;
 
   const results = [];
+  // 서버에 물어보지 않고 메모리(quickMap)에서 즉시 필터링
   for (const id in quickMap) {
     const student = quickMap[id];
     if (student.name.includes(query) || id.includes(query)) {
-      results.push({
-        'ID': id,
-        '이름': student.name,
-        '마지막출석': student.lastDate,
-        '포인트': '조회 중...' 
+      results.push({ 
+        'ID': id, 
+        '이름': student.name, 
+        '마지막출석': student.lastDate, 
+        '포인트': student.point || 0 // 초기 로드 시 포인트도 가져오도록 initQuickMap 수정 필요
       });
     }
   }
 
-  if (results.length > 0) {
-    // 로컬 결과가 있으면 즉시 렌더링 (로더 안 뜸)
-    renderResults(results, type);
-    // 상세 정보(포인트 등)는 백그라운드에서 가져와 업데이트
-    callApi({ action: 'searchName', name: query }, false).then(res => {
-      if (res && res.data) renderResults(res.data, type);
-    });
+  // 즉시 화면 렌더링 (로더 자체가 필요 없음)
+  renderResults(results, type);
+  
+  if (results.length === 0) {
+    const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+    document.getElementById(containerId).innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>로컬 명단에 없습니다.</p>";
+  }
+}
+
+// [개선] 카드 태그 조회 (100% 로컬 quickMap 사용)
+function findByNfc(id, type) {
+  const student = quickMap[id];
+  if (student) {
+    renderResults([{ 
+      'ID': id, 
+      '이름': student.name, 
+      '마지막출석': student.lastDate, 
+      '포인트': student.point || 0 
+    }], type);
   } else {
-    // 로컬에 없으면 서버 전체 조회 (로더 뜸)
-    const res = await callApi({ action: 'searchName', name: query }, true);
-    if(res && res.data) renderResults(res.data, type);
-    else {
-      const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-      document.getElementById(containerId).innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
-    }
+    alert("로컬 명단에 없는 카드입니다. (새 학생 등록 필요)");
   }
 }
 
