@@ -238,28 +238,22 @@ function findStudent(type) {
 
 // [개선] 카드 태그 조회 (100% 로컬 quickMap 사용)
 function findByNfc(id, type) {
+  // 1. 우선 로컬 메모리(quickMap)에서 해당 ID를 찾습니다.
   const student = quickMap[id];
+
   if (student) {
+    // 2. 찾았다면 서버에 물어보지 않고 즉시 결과를 화면에 그립니다. (로딩창 X)
     renderResults([{ 
       'ID': id, 
       '이름': student.name, 
-      '마지막출석': student.lastDate, 
+      '마지막출석': student.lastDate || '', 
       '포인트': student.point || 0 
     }], type);
   } else {
-    alert("로컬 명단에 없는 카드입니다. (새 학생 등록 필요)");
+    // 3. 만약 로컬에 없다면, 그때만 선택적으로 서버에서 전체 명단을 새로 받아오거나 알림을 띄웁니다.
+    alert("로컬 명단에 없는 카드입니다. (새 학생 등록이 필요하거나 새로고침 하세요)");
   }
 }
-
-async function findByNfc(id, type) {
-  const res = await callApi({ action: 'searchName', name: '' }, true);
-  if (res && res.data) {
-    const student = res.data.find(s => String(s['ID']) === String(id));
-    if (student) renderResults([student], type);
-    else alert("등록되지 않은 카드입니다.");
-  }
-}
-
 function renderResults(data, type) {
   const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
   const container = document.getElementById(containerId);
