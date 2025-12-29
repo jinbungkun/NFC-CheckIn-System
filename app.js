@@ -403,7 +403,7 @@ function showPage(p) {
   // 1) 모든 input 값 비우기 (NFC 브릿지 제외)
   const allInputs = document.querySelectorAll('input');
   allInputs.forEach(input => {
-    if (input.id !== 'nfc-bridge' && input.type !== 'button' && input.type !== 'submit') {
+    if (input.id !== 'nfc-bridge' && input.id !== 'cfg-url' && input.type !== 'button' && input.type !== 'submit') {
       input.value = "";
     }
   });
