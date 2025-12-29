@@ -5,7 +5,7 @@ let currentHeaders = [];
 let quickMap = {};
 const nfcBridge = document.getElementById('nfc-bridge');
 
-// [초기화] 데이터 로드
+// [초기화] 데이터 로드 (앱 켤 때 캐시 저장)
 async function initQuickMap() {
   const res = await callApi({ action: 'getQuickMap' }, false);
   if (res && res.success) {
@@ -49,15 +49,19 @@ function initFocusGuard() {
 async function callApi(data, showLoader = true) {
   const url = localStorage.getItem('GAS_URL');
   if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
+  
   if (showLoader) {
     isApiLoading = true;
     document.getElementById('loader').style.display = 'flex';
   }
+  
   try {
     const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
     return await res.json();
-  } catch (e) { return null; }
-  finally { 
+  } catch (e) { 
+    console.error(e);
+    return null; 
+  } finally { 
     if (showLoader) {
       isApiLoading = false; 
       document.getElementById('loader').style.display = 'none'; 
@@ -72,7 +76,6 @@ function doCheckin() {
   const input = document.getElementById('manual-id');
   const id = input.value.trim();
   if(!id) return;
-
   input.value = ""; 
 
   const student = quickMap[id]; 
@@ -83,24 +86,15 @@ function doCheckin() {
       renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
       return;
     }
-
     renderCheckinUI(student.name, "출석 완료! ✅", "var(--success)");
     student.lastDate = today; 
-
-    callApi({ action: 'checkin', id: id }, false).then(res => {
-      if (!res || !res.success) {
-        if (res && res.status !== "already") {
-          student.lastDate = ""; 
-          renderCheckinUI(student.name, "서버 저장 실패 ❌", "var(--danger)");
-        }
-      }
-    });
+    callApi({ action: 'checkin', id: id }, false);
   } else {
     renderCheckinUI("조회 중", "명단 확인 중...", "var(--muted)");
     callApi({ action: 'checkin', id: id }, true).then(res => {
       if (res && res.success) {
         renderCheckinUI(res.name, "출석 성공!", "var(--success)");
-        quickMap[id] = { name: res.name, lastDate: new Date().toLocaleDateString('sv-SE') };
+        quickMap[id] = { name: res.name, lastDate: new Date().toLocaleDateString('sv-SE'), point: res.point || 0 };
       } else {
         renderCheckinUI("실패", res.message || "미등록 정보", "var(--danger)");
       }
@@ -114,6 +108,200 @@ function renderCheckinUI(name, msg, color) {
       <h3 style="color:${color}; margin: 5px 0;">${name}</h3>
       <p style="margin: 5px 0; font-weight: bold;">${msg}</p>
     </div>`;
+}
+
+// [검색] 이름/ID 입력 검색 (서버 vs 로컬 분기 처리)
+async function findStudent(type) {
+  const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
+  const query = document.getElementById(inputId).value.trim();
+  if (!query) return;
+
+  // 1. [일반 조회]는 무조건 서버에서 최신 데이터 가져오기
+  if (type === 'search') {
+    const res = await callApi({ action: 'searchName', name: query }, true); // 로딩창 ON
+    if (res && res.data) {
+      renderResults(res.data, type);
+    } else {
+      document.getElementById('search-results').innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>검색 결과가 없습니다.</p>";
+    }
+    return;
+  }
+
+  // 2. [포인트/카드]는 로컬 quickMap 사용 (속도 최우선)
+  const results = [];
+  for (const id in quickMap) {
+    const student = quickMap[id];
+    if (student.name.includes(query) || id.includes(query)) {
+      results.push({ 
+        'ID': id, 
+        '이름': student.name, 
+        '마지막출석': student.lastDate, 
+        '포인트': student.point || 0 
+      });
+    }
+  }
+  renderResults(results, type);
+  
+  if (results.length === 0) {
+    const containerId = type === 'point' ? 'point-target-area' : 'card-target-area';
+    document.getElementById(containerId).innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>로컬 명단에 없습니다.</p>";
+  }
+}
+
+// [검색] NFC 태그 (서버 vs 로컬 분기 처리)
+async function findByNfc(id, type) {
+  // 1. [일반 조회]는 서버에서 최신 데이터 확인
+  if (type === 'search') {
+    // 이름 없이 호출하면 전체 혹은 ID 검색 로직이 서버에 있다고 가정
+    const res = await callApi({ action: 'searchName', name: '' }, true); 
+    if (res && res.data) {
+      // 서버 결과에서 ID 매칭
+      const found = res.data.find(s => String(s['ID']) === String(id));
+      if (found) renderResults([found], type);
+      else alert("서버 명단에 없는 카드입니다.");
+    }
+    return;
+  }
+
+  // 2. [포인트/카드]는 로컬 데이터 사용
+  const student = quickMap[id];
+  if (student) {
+    renderResults([{ 
+      'ID': id, 
+      '이름': student.name, 
+      '마지막출석': student.lastDate, 
+      '포인트': student.point || 0 
+    }], type);
+  } else {
+    alert("로컬 명단에 없습니다. (새로고침 필요할 수 있음)");
+  }
+}
+
+// [렌더링] 결과 화면 출력 (포인트 UI 간소화 및 버튼 변경 적용)
+function renderResults(data, type) {
+  const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+  const container = document.getElementById(containerId);
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
+    return;
+  }
+
+  container.innerHTML = data.map(s => {
+    let infoLines = "";
+
+    // [UI 분기] 포인트 페이지는 정보 간소화
+    if (type === 'point') {
+      infoLines = `<div style="margin: 5px 0; color:var(--muted); font-size:0.9rem;">ID: ${s['ID']}</div>`;
+    } else {
+      // 일반 조회 및 카드 교체는 상세 정보 표시
+      infoLines = currentHeaders.map(header => {
+        let val = s[header] !== undefined ? s[header] : "";
+        if ((header === "마지막출석" || header === "등록일") && val) {
+          val = val.substring(0, 10); // 날짜만 표시
+        }
+        return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
+      }).join('');
+    }
+
+    return `
+      <div class="student-info-card">
+        <div class="student-header">
+          <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름'] || '미기입'}</span>
+          <span style="color:var(--accent); font-weight:bold;">${s['포인트'] || 0} pt</span>
+        </div>
+        
+        <div style="margin: 10px 0;">${infoLines}</div>
+
+        ${type === 'point' ? `
+          <div class="point-grid" style="grid-template-columns: repeat(3, 1fr); gap:5px; margin-bottom:8px;">
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100, event)">+100</button>
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 300, event)">+300</button>
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500, event)">+500</button>
+          </div>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="pt-inp-${s['ID']}" placeholder="직접 입력" style="flex:1; padding:8px; border-radius:4px; border:none;">
+            <button class="btn btn-primary" style="width:60px;" onclick="updatePtManual('${s['ID']}', event)">지급</button>
+          </div>` : ''}
+
+        ${type === 'card' ? `
+          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
+          <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// [기능] 수동 포인트 지급 (입력 필드 값 사용)
+function updatePtManual(id, event) {
+  const input = document.getElementById(`pt-inp-${id}`);
+  const val = input.value;
+  if (!val) return alert("포인트를 입력하세요");
+  updatePt(id, val, event);
+  input.value = ""; // 입력창 비우기
+}
+
+// [기능] 포인트 지급 실행 (UI 즉시 반영 + 서버 전송)
+async function updatePt(id, amt, event) {
+  if (!amt || isNaN(amt)) return;
+  const amount = Number(amt);
+  
+  const btn = event ? event.target : null;
+  const originalText = btn ? btn.innerText : "";
+
+  if (btn) {
+    btn.innerText = "전송됨 ✅";
+    btn.style.opacity = "0.5";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.opacity = "1";
+      btn.disabled = false;
+    }, 2000);
+  }
+
+  // 로컬 데이터 즉시 업데이트 (화면 갱신용)
+  if(quickMap[id]) {
+    quickMap[id].point = (Number(quickMap[id].point) || 0) + amount;
+    // 포인트 페이지라면 현재 표시된 포인트 텍스트도 즉시 갱신 (선택사항, 재검색 시 반영됨)
+    // 여기서는 간단히 재검색을 트리거하지 않고 로컬 값만 바꿈
+  }
+
+  callApi({ action: 'updatePoint', id: id, amount: amount }, false).then(res => {
+    if (!res || !res.success) {
+      console.error("포인트 지급 실패:", id);
+      if (btn) btn.innerText = "실패 ❌";
+    }
+  });
+}
+
+// [관리자] 학생 추가
+async function registerStudent() {
+  const idVal = document.getElementById('field-ID').value;
+  const nameVal = document.getElementById('field-이름').value;
+  if(!idVal) return alert("카드를 태그하여 ID를 먼저 입력하세요.");
+  if(!nameVal) return alert("학생 이름을 입력하세요.");
+  const fields = {};
+  currentHeaders.forEach(h => {
+    const el = document.getElementById(`field-${h}`);
+    if(el) fields[h] = el.value;
+  });
+  const res = await callApi({ action: 'add', fields: fields });
+  if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
+}
+
+// [관리자] 카드 교체
+async function execCardChange(oldId, name) {
+  const newId = document.getElementById('new-card-input').value;
+  if(!newId) return alert("새 카드를 태그하세요.");
+  const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId });
+  if(res.success) { alert("교체 완료"); initQuickMap(); showPage('checkin'); }
+}
+
+// [설정] 저장
+async function saveSettings() {
+  const url = document.getElementById('cfg-url').value;
+  localStorage.setItem('GAS_URL', url);
+  const res = await callApi({ action: 'initSheet', pw: document.getElementById('cfg-pw').value });
+  if(res) { alert("연결 성공!"); refreshSchema(true); initQuickMap(); }
 }
 
 // [관리자] 모드 전환
@@ -141,6 +329,29 @@ function updateAdminUI() {
   status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
   status.className = isAdmin ? "admin-active" : "";
   document.querySelector('.admin-lock-btn').innerText = isAdmin ? "🔓" : "🔒";
+}
+
+// [관리자] 스키마(헤더) 갱신
+async function refreshSchema(force = false) {
+  if (!force && currentHeaders.length > 0) return renderAddFields();
+  const res = await callApi({ action: 'getSchema' });
+  if (!res || !res.headers) return;
+  currentHeaders = res.headers;
+  renderAddFields();
+}
+
+function renderAddFields() {
+  const container = document.getElementById('dynamic-add-fields');
+  container.innerHTML = "";
+  currentHeaders.forEach(header => {
+    if (['포인트', '등록일', '마지막출석'].includes(header)) return;
+    const input = document.createElement('input');
+    input.placeholder = header;
+    input.id = `field-${header}`;
+    if (header === 'ID') { input.readOnly = true; input.placeholder = "ID (카드를 태그하세요)"; }
+    container.appendChild(input);
+  });
+  initFocusGuard();
 }
 
 // [UI] 페이지 이동
@@ -182,179 +393,6 @@ function processNfc(val) {
       else findByNfc(val, 'card');
     }
   }
-}
-
-// [관리자] 명단 조회 및 렌더링
-async function refreshSchema(force = false) {
-  if (!force && currentHeaders.length > 0) return renderAddFields();
-  const res = await callApi({ action: 'getSchema' });
-  if (!res || !res.headers) return;
-  currentHeaders = res.headers;
-  renderAddFields();
-}
-
-function renderAddFields() {
-  const container = document.getElementById('dynamic-add-fields');
-  container.innerHTML = "";
-  currentHeaders.forEach(header => {
-    if (['포인트', '등록일', '마지막출석'].includes(header)) return;
-    const input = document.createElement('input');
-    input.placeholder = header;
-    input.id = `field-${header}`;
-    if (header === 'ID') { input.readOnly = true; input.placeholder = "ID (카드를 태그하세요)"; }
-    container.appendChild(input);
-  });
-  initFocusGuard();
-}
-
-// [개선] 학생 검색 (로컬 캐시 우선 검색으로 로더 방지)
-function findStudent(type) {
-  const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
-  const query = document.getElementById(inputId).value.trim();
-  if (!query) return;
-
-  const results = [];
-  // 서버에 물어보지 않고 메모리(quickMap)에서 즉시 필터링
-  for (const id in quickMap) {
-    const student = quickMap[id];
-    if (student.name.includes(query) || id.includes(query)) {
-      results.push({ 
-        'ID': id, 
-        '이름': student.name, 
-        '마지막출석': student.lastDate, 
-        '포인트': student.point || 0 // 초기 로드 시 포인트도 가져오도록 initQuickMap 수정 필요
-      });
-    }
-  }
-
-  // 즉시 화면 렌더링 (로더 자체가 필요 없음)
-  renderResults(results, type);
-  
-  if (results.length === 0) {
-    const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-    document.getElementById(containerId).innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>로컬 명단에 없습니다.</p>";
-  }
-}
-
-// [개선] 카드 태그 조회 (100% 로컬 quickMap 사용)
-function findByNfc(id, type) {
-  // 1. 우선 로컬 메모리(quickMap)에서 해당 ID를 찾습니다.
-  const student = quickMap[id];
-
-  if (student) {
-    // 2. 찾았다면 서버에 물어보지 않고 즉시 결과를 화면에 그립니다. (로딩창 X)
-    renderResults([{ 
-      'ID': id, 
-      '이름': student.name, 
-      '마지막출석': student.lastDate || '', 
-      '포인트': student.point || 0 
-    }], type);
-  } else {
-    // 3. 만약 로컬에 없다면, 그때만 선택적으로 서버에서 전체 명단을 새로 받아오거나 알림을 띄웁니다.
-    alert("로컬 명단에 없는 카드입니다. (새 학생 등록이 필요하거나 새로고침 하세요)");
-  }
-}
-function renderResults(data, type) {
-  const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-  const container = document.getElementById(containerId);
-  if (!data || data.length === 0) {
-    container.innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
-    return;
-  }
-  container.innerHTML = data.map(s => {
-    const infoLines = currentHeaders.map(header => {
-        let val = s[header] !== undefined ? s[header] : "";
-        if ((header === "마지막출석" || header === "등록일") && val) {
-          const d = new Date(val);
-          if (!isNaN(d.getTime())) {
-            const Y = d.getFullYear();
-            const M = String(d.getMonth() + 1).padStart(2, '0');
-            const D = String(d.getDate()).padStart(2, '0');
-            const h = String(d.getHours()).padStart(2, '0');
-            const m = String(d.getMinutes()).padStart(2, '0');
-            val = header === "마지막출석" ? `${Y}-${M}-${D} ${h}:${m}` : `${Y}-${M}-${D}`;
-          }
-        }
-        return `<div class="detail-info"><b>${header}:</b> ${val}</div>`;
-      }).join('');
-
-    return `
-      <div class="student-info-card">
-        <div class="student-header">
-          <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름'] || '미기입'}</span>
-          <span style="color:var(--accent); font-weight:bold;">${s['포인트'] || 0} pt</span>
-        </div>
-        <div style="margin: 10px 0;">${infoLines}</div>
-        ${type === 'point' ? `
-          <div class="point-grid">
-            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100, event)">+100</button>
-            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500, event)">+500</button>
-            <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'), event)">직접</button>
-          </div>` : ''}
-        ${type === 'card' ? `
-          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
-          <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
-      </div>`;
-  }).join('');
-}
-
-// [관리자] 학생 추가 / 포인트 수정 / 카드 교체
-async function registerStudent() {
-  const idVal = document.getElementById('field-ID').value;
-  const nameVal = document.getElementById('field-이름').value;
-  if(!idVal) return alert("카드를 태그하여 ID를 먼저 입력하세요.");
-  if(!nameVal) return alert("학생 이름을 입력하세요.");
-  const fields = {};
-  currentHeaders.forEach(h => {
-    const el = document.getElementById(`field-${h}`);
-    if(el) fields[h] = el.value;
-  });
-  const res = await callApi({ action: 'add', fields: fields });
-  if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
-}
-
-// [개선] 포인트 지급 (버튼 피드백 즉시 제공 + 백그라운드 전송)
-async function updatePt(id, amt, event) {
-  if (!amt || isNaN(amt)) return;
-  const amount = Number(amt);
-  
-  const btn = event ? event.target : null;
-  const originalText = btn ? btn.innerText : "";
-
-  if (btn) {
-    btn.innerText = "전송됨 ✅";
-    btn.style.opacity = "0.5";
-    btn.disabled = true;
-    setTimeout(() => {
-      btn.innerText = originalText;
-      btn.style.opacity = "1";
-      btn.disabled = false;
-    }, 2000);
-  }
-
-  callApi({ action: 'updatePoint', id: id, amount: amount }, false).then(res => {
-    if (!res || !res.success) {
-      console.error("포인트 지급 실패:", id);
-      if (btn) btn.innerText = "재시도 ❌";
-    } else {
-      console.log("포인트 지급 완료:", id, amount);
-    }
-  });
-}
-
-async function execCardChange(oldId, name) {
-  const newId = document.getElementById('new-card-input').value;
-  if(!newId) return alert("새 카드를 태그하세요.");
-  const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId });
-  if(res.success) { alert("교체 완료"); initQuickMap(); showPage('checkin'); }
-}
-
-// [설정] 저장
-async function saveSettings() {
-  const url = document.getElementById('cfg-url').value;
-  localStorage.setItem('GAS_URL', url);
-  const res = await callApi({ action: 'initSheet', pw: document.getElementById('cfg-pw').value });
-  if(res) { alert("연결 성공!"); refreshSchema(true); initQuickMap(); }
 }
 
 // [시작] 초기 실행
