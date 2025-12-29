@@ -67,7 +67,7 @@ async function callApi(data, showLoader = true) {
   }
 }
 
-// [기능] 출석 체크 로직
+// [기능] 출석 체크 로직 (낙관적 UI)
 function doCheckin() {
   const input = document.getElementById('manual-id');
   const id = input.value.trim();
@@ -207,13 +207,13 @@ function renderAddFields() {
   initFocusGuard();
 }
 
+// [개선] 학생 검색 (로컬 캐시 우선 검색으로 로더 방지)
 async function findStudent(type) {
   const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
   const query = document.getElementById(inputId).value.trim();
   
   if (!query) return;
 
-  // 1. [로컬 검색] quickMap에서 이름이나 ID가 포함된 학생 찾기
   const results = [];
   for (const id in quickMap) {
     const student = quickMap[id];
@@ -222,23 +222,26 @@ async function findStudent(type) {
         'ID': id,
         '이름': student.name,
         '마지막출석': student.lastDate,
-        '포인트': '조회 중...' // 포인트는 최신 정보가 필요할 수 있으므로
+        '포인트': '조회 중...' 
       });
     }
   }
 
-  // 2. 로컬에 결과가 있다면 즉시 렌더링 (서버 기다리지 않음)
   if (results.length > 0) {
+    // 로컬 결과가 있으면 즉시 렌더링 (로더 안 뜸)
     renderResults(results, type);
-    
-    // 3. [선택사항] 포인트 등 상세 정보만 서버에서 백그라운드로 업데이트
+    // 상세 정보(포인트 등)는 백그라운드에서 가져와 업데이트
     callApi({ action: 'searchName', name: query }, false).then(res => {
       if (res && res.data) renderResults(res.data, type);
     });
   } else {
-    // 로컬에 없으면 기존처럼 서버 조회
+    // 로컬에 없으면 서버 전체 조회 (로더 뜸)
     const res = await callApi({ action: 'searchName', name: query }, true);
     if(res && res.data) renderResults(res.data, type);
+    else {
+      const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+      document.getElementById(containerId).innerHTML = "<p style='text-align:center; padding:20px; color:var(--muted);'>결과가 없습니다.</p>";
+    }
   }
 }
 
@@ -284,10 +287,10 @@ function renderResults(data, type) {
         <div style="margin: 10px 0;">${infoLines}</div>
         ${type === 'point' ? `
           <div class="point-grid">
-    <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100, event)">+100</button>
-    <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500, event)">+500</button>
-    <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'), event)">직접</button>
-  </div>` : ''}
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100, event)">+100</button>
+            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500, event)">+500</button>
+            <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'), event)">직접</button>
+          </div>` : ''}
         ${type === 'card' ? `
           <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
           <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
@@ -310,27 +313,25 @@ async function registerStudent() {
   if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
 }
 
+// [개선] 포인트 지급 (버튼 피드백 즉시 제공 + 백그라운드 전송)
 async function updatePt(id, amt, event) {
   if (!amt || isNaN(amt)) return;
   const amount = Number(amt);
   
-  // 클릭된 버튼 요소 가져오기 (UI 피드백용)
   const btn = event ? event.target : null;
   const originalText = btn ? btn.innerText : "";
 
-  // 1. [즉시 피드백] 버튼 상태 변경 (사용자는 여기서 작업 끝났다고 느낌)
   if (btn) {
     btn.innerText = "전송됨 ✅";
     btn.style.opacity = "0.5";
-    btn.disabled = true; // 중복 클릭 방지
+    btn.disabled = true;
     setTimeout(() => {
       btn.innerText = originalText;
       btn.style.opacity = "1";
       btn.disabled = false;
-    }, 2000); // 2초 후 버튼 복구
+    }, 2000);
   }
 
-  // 2. [백그라운드 통신] 로더 없이 조용히 실행
   callApi({ action: 'updatePoint', id: id, amount: amount }, false).then(res => {
     if (!res || !res.success) {
       console.error("포인트 지급 실패:", id);
