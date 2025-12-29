@@ -209,9 +209,37 @@ function renderAddFields() {
 
 async function findStudent(type) {
   const inputId = type === 'search' ? 'search-input' : (type === 'point' ? 'point-search-input' : 'card-search-input');
-  const nameInput = document.getElementById(inputId).value;
-  const res = await callApi({ action: 'searchName', name: nameInput }, true);
-  if(res && res.data) renderResults(res.data, type);
+  const query = document.getElementById(inputId).value.trim();
+  
+  if (!query) return;
+
+  // 1. [로컬 검색] quickMap에서 이름이나 ID가 포함된 학생 찾기
+  const results = [];
+  for (const id in quickMap) {
+    const student = quickMap[id];
+    if (student.name.includes(query) || id.includes(query)) {
+      results.push({
+        'ID': id,
+        '이름': student.name,
+        '마지막출석': student.lastDate,
+        '포인트': '조회 중...' // 포인트는 최신 정보가 필요할 수 있으므로
+      });
+    }
+  }
+
+  // 2. 로컬에 결과가 있다면 즉시 렌더링 (서버 기다리지 않음)
+  if (results.length > 0) {
+    renderResults(results, type);
+    
+    // 3. [선택사항] 포인트 등 상세 정보만 서버에서 백그라운드로 업데이트
+    callApi({ action: 'searchName', name: query }, false).then(res => {
+      if (res && res.data) renderResults(res.data, type);
+    });
+  } else {
+    // 로컬에 없으면 기존처럼 서버 조회
+    const res = await callApi({ action: 'searchName', name: query }, true);
+    if(res && res.data) renderResults(res.data, type);
+  }
 }
 
 async function findByNfc(id, type) {
@@ -256,10 +284,10 @@ function renderResults(data, type) {
         <div style="margin: 10px 0;">${infoLines}</div>
         ${type === 'point' ? `
           <div class="point-grid">
-            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100)">+100</button>
-            <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500)">+500</button>
-            <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'))">직접</button>
-          </div>` : ''}
+    <button class="btn btn-success" onclick="updatePt('${s['ID']}', 100, event)">+100</button>
+    <button class="btn btn-success" onclick="updatePt('${s['ID']}', 500, event)">+500</button>
+    <button class="btn btn-primary" onclick="updatePt('${s['ID']}', prompt('금액 입력'), event)">직접</button>
+  </div>` : ''}
         ${type === 'card' ? `
           <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly>
           <button class="btn btn-danger" onclick="execCardChange('${s['ID']}', '${s['이름']}')">교체 확정</button>` : ''}
@@ -282,10 +310,35 @@ async function registerStudent() {
   if(res && res.success) { alert("등록 완료"); initQuickMap(); showPage('checkin'); }
 }
 
-async function updatePt(id, amt) {
-  if(!amt) return;
-  const res = await callApi({ action: 'updatePoint', id: id, amount: amt });
-  if(res.success) { alert("완료"); findStudent('point'); }
+async function updatePt(id, amt, event) {
+  if (!amt || isNaN(amt)) return;
+  const amount = Number(amt);
+  
+  // 클릭된 버튼 요소 가져오기 (UI 피드백용)
+  const btn = event ? event.target : null;
+  const originalText = btn ? btn.innerText : "";
+
+  // 1. [즉시 피드백] 버튼 상태 변경 (사용자는 여기서 작업 끝났다고 느낌)
+  if (btn) {
+    btn.innerText = "전송됨 ✅";
+    btn.style.opacity = "0.5";
+    btn.disabled = true; // 중복 클릭 방지
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.opacity = "1";
+      btn.disabled = false;
+    }, 2000); // 2초 후 버튼 복구
+  }
+
+  // 2. [백그라운드 통신] 로더 없이 조용히 실행
+  callApi({ action: 'updatePoint', id: id, amount: amount }, false).then(res => {
+    if (!res || !res.success) {
+      console.error("포인트 지급 실패:", id);
+      if (btn) btn.innerText = "재시도 ❌";
+    } else {
+      console.log("포인트 지급 완료:", id, amount);
+    }
+  });
 }
 
 async function execCardChange(oldId, name) {
