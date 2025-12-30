@@ -164,16 +164,28 @@ function updatePtManual(id, event) {
   input.value = "";
 }
 
-// [6. 학생 등록 및 카드 교체]
 async function registerStudent() {
   const fields = {};
+  // currentHeaders를 기반으로 필드 수집
   currentHeaders.forEach(h => {
     const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
     if (el) fields[h] = el.value.trim();
   });
+
   if(!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
+
+  // 전송 전 로그 확인 (개발자 도구 콘솔에서 확인 가능)
+  console.log("전송 데이터:", fields);
+
   const res = await callApi({ action: 'add', fields: fields }, true);
-  if(res && res.success) { alert("등록 완료!"); await initQuickMap(); showPage('checkin'); }
+  
+  if(res && res.success) { 
+    alert("등록 완료!"); 
+    await initQuickMap(); 
+    showPage('checkin'); 
+  } else {
+    alert("등록 실패: " + (res ? res.message : "서버 응답 없음"));
+  }
 }
 
 async function execCardChange(oldId, name) {
