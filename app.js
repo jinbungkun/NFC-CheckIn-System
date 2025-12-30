@@ -179,15 +179,29 @@ async function execCardChange(oldId, name) {
 
 // [7. 페이지 관리 및 관리자 모드]
 function showPage(p) {
+  // 1. 페이지 활성화 제어
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   const targetPage = document.getElementById('page-' + p);
   if (targetPage) targetPage.classList.add('active');
 
+  // 2. 네비게이션 버튼 스타일 변경
   document.querySelectorAll('.nav button').forEach(btn => btn.classList.toggle('active', btn.id === 'nav-' + p));
+
+  // 3. ★ 모든 입력 필드 초기화 (설정 제외) ★
   document.querySelectorAll('input').forEach(input => {
-    if (!['nfc-bridge', 'cfg-url', 'cfg-pw'].includes(input.id) && input.type !== 'button') input.value = "";
+    if (!['nfc-bridge', 'cfg-url', 'cfg-pw'].includes(input.id) && input.type !== 'button') {
+      input.value = "";
+    }
   });
 
+  // 4. ★ 모든 결과 출력 영역 초기화 ★
+  const results = ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'];
+  results.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = "";
+  });
+
+  // 5. 페이지별 특수 동작 (등록 페이지 필드 생성 등)
   if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
   if (p === 'add') renderAddFields();
 
