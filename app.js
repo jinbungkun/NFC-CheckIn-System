@@ -166,40 +166,34 @@ function updatePtManual(id, event) {
 
 async function registerStudent() {
     const fields = {};
-    // 1. 데이터 수집
+    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
+
+    // 1. 데이터 수집 (상태 등 제외)
     currentHeaders.forEach(h => {
-        const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-        if (el) fields[h] = el.value.trim();
+        if (!skipHeaders.includes(h)) {
+            const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+            if (el) fields[h] = el.value.trim();
+        }
     });
 
-    // 필수값 체크
-    if (!fields['ID'] || !fields['이름']) {
-        return alert("ID(카드 태그)와 이름은 필수입니다.");
-    }
+    if (!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
 
-    // 2. 서버 전송
+    // 2. 서버 통신
     const res = await callApi({ action: 'add', fields: fields }, true);
     
     if (res && res.success) {
-        alert(`${fields['이름']} 학생 등록 완료!`);
-        
-        // 3. [디테일 수정] 화면 이동 대신 데이터만 비우기
+        // 3. 알림 후 데이터만 비우기 (화면 이동 X)
         currentHeaders.forEach(h => {
-            const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-            if (el) {
-                el.value = ""; // 입력값 초기화
+            if (!skipHeaders.includes(h)) {
+                const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+                if (el) el.value = ""; 
             }
         });
 
-        // 4. 퀵맵(리스트) 최신화 (백그라운드에서 실행)
-        initQuickMap();
-        
-        // 5. 다음 등록을 위해 ID 입력칸(카드 태그)에 포커스 주기
-        const idInput = document.getElementById(PAGE_CONFIG.register.inputId);
-        if (idInput) idInput.focus();
-
-    } else {
-        alert("등록 실패: " + (res ? res.message : "서버 응답 오류"));
+        // 4. 다음 등록을 위해 포커스 이동 및 리스트 갱신
+        alert("등록 완료!");
+        initQuickMap(); 
+        document.getElementById(PAGE_CONFIG.register.inputId).focus();
     }
 }
 
