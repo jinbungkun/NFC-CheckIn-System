@@ -13,7 +13,7 @@
   <div class="header">
     <div style="display: flex; gap: 8px; align-items: center;">
       <span id="mode-status">● 학생 모드</span>
-      <span id="focus-indicator"></span>
+      <span id="focus-indicator">📡 리더기 대기</span>
     </div>
     <button class="admin-lock-btn" onclick="toggleAdmin()">🔒</button>
   </div>
@@ -30,7 +30,7 @@
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
       <h2>📡 실시간 출석</h2>
-      <input type="tel" id="CheckIn" placeholder="카드 태그 또는 번호" style="text-align:center; font-size:1.5rem;">
+      <input type="tel" id="CheckIn" placeholder="카드 태그 또는 번호" style="text-align:center; font-size:1.5rem;" autocomplete="off">
       <button class="btn btn-primary" onclick="doCheckin()">출석</button>
       <div id="checkin-result"></div>
     </div>
@@ -38,21 +38,21 @@
 
   <div id="page-search" class="page">
     <h2>🔍 정보 조회</h2>
-    <input type="text" id="Search" placeholder="이름 검색...">
+    <input type="text" id="Search" placeholder="이름 검색..." autocomplete="off">
     <button class="btn btn-primary" onclick="findStudent('search')">검색</button>
     <div id="search-results"></div>
   </div>
 
   <div id="page-point" class="page">
     <h2>💰 포인트 지급</h2>
-    <input type="text" id="Point" placeholder="이름 또는 카드 태그">
+    <input type="text" id="Point" placeholder="이름 또는 카드 태그" autocomplete="off">
     <button class="btn btn-primary" onclick="findStudent('point')">학생 찾기</button>
     <div id="point-target-area"></div>
   </div>
 
   <div id="page-card" class="page">
     <h2>💳 카드 교체</h2>
-    <input type="text" id="Card" placeholder="학생 이름 검색">
+    <input type="text" id="Card" placeholder="학생 이름 검색" autocomplete="off">
     <button class="btn btn-primary" onclick="findStudent('card')">검색</button>
     <div id="card-target-area"></div>
   </div>
@@ -60,7 +60,7 @@
   <div id="page-add" class="page">
     <h2>👤 학생 등록</h2>
     <div id="dynamic-add-fields"></div>
-    <button class="btn btn-success" onclick="registerStudent()">등록하기</button>
+    <button class="btn btn-success" onclick="registerStudent()" style="width:100%; margin-top:15px;">등록하기</button>
   </div>
 
   <div id="page-settings" class="page">
@@ -70,7 +70,7 @@
     <button class="btn btn-primary" onclick="saveSettings()">저장 및 시트 연결</button>
   </div>
 
-  <input type="text" id="nfc-bridge" inputmode="none">
+  <input type="text" id="nfc-bridge" inputmode="none" style="position:fixed; bottom:-100px; left:0; opacity:0;">
 
   <script src="app.js"></script>
 </body>
