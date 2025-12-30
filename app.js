@@ -341,25 +341,49 @@ function renderResults(data, type) {
   const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
   const container = document.getElementById(containerId);
   if (!container) return;
-  if (!data || data.length === 0) { container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; return; }
+  
+  if (!data || data.length === 0) { 
+    container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
+    return; 
+  }
 
   container.innerHTML = data.map(s => {
-    let infoLines = type === 'point' ? `<div style="margin: 5px 0; color:var(--muted); font-size:0.9rem;">ID: ${s.ID}</div>` :
-      currentHeaders.map(h => {
-        let val = s[h] || "";
-        return `<div class="detail-info"><b>${h}:</b> ${val}</div>`;
-      }).join('');
+    // 1. 상태별 뱃지 색상 결정
+    const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
 
-    return `<div class="student-info-card">
+    return `
+    <div class="student-info-card">
       <div class="student-header">
-        <span style="font-size:1.1rem; font-weight:bold; color:white;">${s['이름']}</span>
-        <span style="color:var(--accent); font-weight:bold;">${s['포인트']} pt</span>
+        <div>
+          <span style="font-size:1.2rem; font-weight:bold; color:white;">${s.이름}</span>
+          <span class="status-badge" style="background:${statusColor}; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:5px; vertical-align:middle;">${s.상태 || '재원'}</span>
+        </div>
+        <span style="color:var(--accent); font-weight:bold;">${s.포인트} pt</span>
       </div>
-      <div style="margin: 10px 0;">${infoLines}</div>
-      ${type === 'point' ? `<div class="point-grid" style="grid-template-columns: repeat(3, 1fr); gap:5px; margin-bottom:8px;">
-        ${[10, 50, 100].map(v => `<button class="btn btn-success" onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>`).join('')}
-      </div><div style="display:flex; gap:5px;"><input type="number" id="pt-inp-${s.ID}" placeholder="직접 입력" style="flex:1; padding:8px; border-radius:4px;"><button class="btn btn-primary" onclick="updatePtManual('${s.ID}', event)">지급</button></div>` : ''}
-      ${type === 'card' ? `<div style="display:flex; flex-direction:column; gap:10px;"><input type="text" id="new-card-input" placeholder="새 카드 태그" readonly style="background:rgba(255,255,255,0.1); color:white;"><button class="btn btn-danger" onclick="execCardChange('${s.ID}', '${s['이름']}')">이 카드로 교체</button></div>` : ''}
+      
+      <div class="master-info-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin: 12px 0; font-size:0.9rem; color:#ccc;">
+        <div><b>🎂 생일:</b> ${s.생년월일 || '-'}</div>
+        <div><b>📱 연락처:</b> ${s.전화번호 || '-'}</div>
+        <div style="grid-column: span 2;"><b>📍 마지막 출석:</b> ${s.마지막출석 || '기록 없음'}</div>
+        <div style="grid-column: span 2; font-size:0.8rem; color:#888;"><b>🆔 ID:</b> ${s.ID}</div>
+      </div>
+
+      ${type === 'point' ? `
+        <div class="point-action-area" style="border-top:1px solid #444; pt:10px; margin-top:10px;">
+          <div class="point-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:5px; margin-bottom:8px; padding-top:10px;">
+            ${[10, 50, 100].map(v => `<button class="btn btn-success" onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>`).join('')}
+          </div>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="pt-inp-${s.ID}" placeholder="직접 입력" style="flex:1; padding:8px; border-radius:4px; background:#333; color:white; border:1px solid #555;">
+            <button class="btn btn-primary" onclick="updatePtManual('${s.ID}', event)">지급</button>
+          </div>
+        </div>` : ''}
+
+      ${type === 'card' ? `
+        <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
+          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly style="width:100%; background:rgba(255,255,255,0.1); color:white; margin-bottom:8px;">
+          <button class="btn btn-danger" style="width:100%;" onclick="execCardChange('${s.ID}', '${s.이름}')">이 학생의 카드로 교체</button>
+        </div>` : ''}
     </div>`;
   }).join('');
 }
