@@ -165,27 +165,42 @@ function updatePtManual(id, event) {
 }
 
 async function registerStudent() {
-  const fields = {};
-  // currentHeaders를 기반으로 필드 수집
-  currentHeaders.forEach(h => {
-    const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-    if (el) fields[h] = el.value.trim();
-  });
+    const fields = {};
+    // 1. 데이터 수집
+    currentHeaders.forEach(h => {
+        const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+        if (el) fields[h] = el.value.trim();
+    });
 
-  if(!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
+    // 필수값 체크
+    if (!fields['ID'] || !fields['이름']) {
+        return alert("ID(카드 태그)와 이름은 필수입니다.");
+    }
 
-  // 전송 전 로그 확인 (개발자 도구 콘솔에서 확인 가능)
-  console.log("전송 데이터:", fields);
+    // 2. 서버 전송
+    const res = await callApi({ action: 'add', fields: fields }, true);
+    
+    if (res && res.success) {
+        alert(`${fields['이름']} 학생 등록 완료!`);
+        
+        // 3. [디테일 수정] 화면 이동 대신 데이터만 비우기
+        currentHeaders.forEach(h => {
+            const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+            if (el) {
+                el.value = ""; // 입력값 초기화
+            }
+        });
 
-  const res = await callApi({ action: 'add', fields: fields }, true);
-  
-  if(res && res.success) { 
-    alert("등록 완료!"); 
-    await initQuickMap(); 
-    showPage('checkin'); 
-  } else {
-    alert("등록 실패: " + (res ? res.message : "서버 응답 없음"));
-  }
+        // 4. 퀵맵(리스트) 최신화 (백그라운드에서 실행)
+        initQuickMap();
+        
+        // 5. 다음 등록을 위해 ID 입력칸(카드 태그)에 포커스 주기
+        const idInput = document.getElementById(PAGE_CONFIG.register.inputId);
+        if (idInput) idInput.focus();
+
+    } else {
+        alert("등록 실패: " + (res ? res.message : "서버 응답 오류"));
+    }
 }
 
 async function execCardChange(oldId, name) {
@@ -341,15 +356,29 @@ function renderAddFields() {
   const container = document.getElementById('dynamic-add-fields');
   if (!container) return;
   container.innerHTML = "";
+
   currentHeaders.forEach(header => {
-    if (['포인트', '등록일', '마지막출석'].includes(header)) return;
+    // 자동 입력되거나 고정값인 필드들은 UI에서 제외
+    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
+    if (skipHeaders.includes(header)) return;
+
+    const label = document.createElement('label');
+    label.innerText = header;
+    label.className = "field-label"; // 스타일용 클래스
+    container.appendChild(label);
+
     const input = document.createElement('input');
-    input.placeholder = header;
-    if (header === 'ID') { input.id = PAGE_CONFIG.register.inputId; input.readOnly = true; input.placeholder = "ID (카드를 태그하세요)"; }
-    else { input.id = `field-${header}`; }
+    input.placeholder = `${header} 입력`;
+    
+    if (header === 'ID') { 
+      input.id = PAGE_CONFIG.register.inputId; 
+      input.readOnly = true; 
+      input.placeholder = "카드를 태그하세요"; 
+    } else { 
+      input.id = `field-${header}`; 
+    }
     container.appendChild(input);
   });
-  initFocusGuard();
 }
 
 // [9. 결과 렌더링]
