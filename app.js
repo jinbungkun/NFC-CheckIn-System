@@ -230,45 +230,85 @@ function showPage(p) {
   setTimeout(focusNfc, 300);
 }
 
-// [2. UI 업데이트 및 페이지 강제 전환 로직]
+// [7. 페이지 관리 및 관리자 모드] - 이 부분 아래에 붙여넣으세요.
+
+/**
+ * 관리자 모드 토글 함수
+ * 비밀번호를 입력받아 관리자 권한을 활성화/비활성화합니다.
+ */
+async function toggleAdmin() {
+  if (!isAdmin) {
+    // 포커스 탈취 방지
+    isUserTyping = true;
+    updateFocusUI();
+
+    // 모바일 브라우저 안정성을 위해 약간의 지연 후 prompt 실행
+    setTimeout(async () => {
+      const pw = prompt("관리자 비밀번호를 입력하세요.");
+      
+      if (!pw) {
+        isUserTyping = false;
+        focusNfc();
+        return;
+      }
+
+      const res = await callApi({ action: 'verifyPw', pw: pw.trim() });
+      
+      if (res && res.success) {
+        isAdmin = true;
+        localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
+        updateAdminUI();
+        await refreshSchema(true);
+        alert("관리자 모드가 활성화되었습니다.");
+      } else {
+        alert("비밀번호 오류: [" + pw + "]");
+      }
+      
+      isUserTyping = false;
+      updateFocusUI();
+      focusNfc();
+    }, 100);
+
+  } else {
+    // 관리자 모드 해제
+    if (confirm("관리자 모드를 종료하시겠습니까?")) {
+      isAdmin = false;
+      localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
+      updateAdminUI();
+      showPage('checkin'); // 해제 시 출석 페이지로 이동
+    }
+  }
+}
+
+/**
+ * 관리자 상태에 따른 UI 업데이트 (중복 정의 제거 및 통합 버전)
+ */
 function updateAdminUI() {
-  // (1) 관리자 전용 버튼 표시/숨김 처리
+  // 1. 관리자 전용 요소 표시/숨김
   document.querySelectorAll('.admin-only-btn').forEach(el => {
     el.style.display = isAdmin ? 'inline-block' : 'none';
   });
 
-  // (2) 상단/하단 상태 텍스트를 관리자 여부에 따라 즉시 변경
+  // 2. 상태 바 텍스트 및 스타일 업데이트
   const status = document.getElementById('mode-status');
   if (status) {
-    // 로컬 데이터가 true면 여기서 즉시 "관리자 모드"로 고정됩니다.
     status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
     status.className = isAdmin ? "admin-active" : "";
   }
 
-  // (3) 자물쇠 아이콘 업데이트
+  // 3. 자물쇠 아이콘 업데이트
   const lockBtn = document.querySelector('.admin-lock-btn');
   if (lockBtn) {
     lockBtn.innerText = isAdmin ? "🔓" : "🔒";
   }
 
-  // (4) ★중요: 관리자 상태인데 학생용 첫 페이지만 보이는 것을 방지★
-  // 관리자라면 '조회'나 '등록' 등 관리자 메뉴를 그대로 유지하게 하거나
-  // 권한이 없는데 관리자 페이지에 있으면 '출석'으로 보냅니다.
+  // 4. 권한 체크: 관리자가 아닌데 관리자 페이지에 있으면 강제 퇴거
   const activePage = document.querySelector('.page.active');
-  if (!isAdmin && activePage && activePage.id !== 'page-checkin' && activePage.id !== 'page-settings') {
+  const adminPages = ['page-search', 'page-point', 'page-card', 'page-add'];
+  
+  if (!isAdmin && activePage && adminPages.includes(activePage.id)) {
     showPage('checkin');
   }
-}
-
-function updateAdminUI() {
-  document.querySelectorAll('.admin-only-btn').forEach(el => el.style.display = isAdmin ? 'inline-block' : 'none');
-  const status = document.getElementById('mode-status');
-  if (status) {
-    status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
-    status.className = isAdmin ? "admin-active" : "";
-  }
-  const lockBtn = document.querySelector('.admin-lock-btn');
-  if (lockBtn) lockBtn.innerText = isAdmin ? "🔓" : "🔒";
 }
 
 // [8. 설정 및 스키마]
