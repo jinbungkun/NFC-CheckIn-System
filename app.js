@@ -234,7 +234,7 @@ async function toggleAdmin() {
       localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
       updateAdminUI();
       await refreshSchema(true);
-    } else alert("비밀번호 오류");
+    } else alert("비밀번호 오류: [" + pw + "]");
   } else {
     isAdmin = false;
     localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
