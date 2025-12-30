@@ -30,7 +30,7 @@
   <div id="page-checkin" class="page active">
     <div style="text-align:center">
       <h2>📡 실시간 출석</h2>
-      <input type="tel" id="manual-id" placeholder="카드 태그 또는 번호" style="text-align:center; font-size:1.5rem;">
+      <input type="tel" id="CheckIn" placeholder="카드 태그 또는 번호" style="text-align:center; font-size:1.5rem;">
       <button class="btn btn-primary" onclick="doCheckin()">출석</button>
       <div id="checkin-result"></div>
     </div>
@@ -38,21 +38,21 @@
 
   <div id="page-search" class="page">
     <h2>🔍 정보 조회</h2>
-    <input type="text" id="search-input" placeholder="이름 검색...">
+    <input type="text" id="Search" placeholder="이름 검색...">
     <button class="btn btn-primary" onclick="findStudent('search')">검색</button>
     <div id="search-results"></div>
   </div>
 
   <div id="page-point" class="page">
     <h2>💰 포인트 지급</h2>
-    <input type="text" id="point-search-input" placeholder="이름 또는 카드 태그">
+    <input type="text" id="Point" placeholder="이름 또는 카드 태그">
     <button class="btn btn-primary" onclick="findStudent('point')">학생 찾기</button>
     <div id="point-target-area"></div>
   </div>
 
   <div id="page-card" class="page">
     <h2>💳 카드 교체</h2>
-    <input type="text" id="card-search-input" placeholder="학생 이름 검색">
+    <input type="text" id="Card" placeholder="학생 이름 검색">
     <button class="btn btn-primary" onclick="findStudent('card')">검색</button>
     <div id="card-target-area"></div>
   </div>
