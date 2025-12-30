@@ -121,28 +121,44 @@ async function doCheckin() {
   if(!id) return;
   input.value = ""; 
 
-  // 1. 로컬에서 먼저 확인 (반응성 최우선)
-  const student = quickMap[id]; 
-  const today = new Date().toLocaleDateString('sv-SE');
-  
-  if (student && student.lastDate === today) {
-    renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
-    return;
-  }
+  // 1. 한국 시간 기준 오늘 날짜 구하기 (YYYY-MM-DD)
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA'); // 'YYYY-MM-DD' 형식 보장
 
-  // 2. 서버 전송
-  const res = await callApi({ action: 'checkin', id: id }, true);
-  if (res && res.success) {
-    renderCheckinUI(res.name, res.message || "출석 성공! ✅", "var(--success)");
-    // 캐시 업데이트
-    if (quickMap[id]) {
-        quickMap[id].lastDate = today;
-        quickMap[id].point = (Number(quickMap[id].point) || 0) + 10;
-    } else {
-        await initQuickMap(); // 신규라면 전체 로드
+  // 2. 로컬에서 즉시 확인 (반응성 최우선)
+  const student = quickMap[id]; 
+  
+  if (student) {
+    // 이미 오늘 출석한 경우 -> 서버 안 가고 즉시 종료
+    if (student.lastDate === today) {
+      renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
+      return;
     }
+
+    // [핵심] 낙관적 UI: 서버 응답 기다리지 않고 성공 화면부터 띄움
+    renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
+    
+    // 로컬 데이터 즉시 업데이트 (다음 중복 태그 방지)
+    student.lastDate = today;
+    student.point = (Number(student.point) || 0) + 10;
+
+    // 서버 전송은 '로딩바 없이' 백그라운드에서 실행
+    callApi({ action: 'checkin', id: id }, false).then(res => {
+      if (!res || !res.success) {
+        // 서버 저장 실패시에만 알림
+        renderCheckinUI(student.name, "⚠️ 서버 저장 오류", "var(--danger)");
+      }
+    });
+
   } else {
-    renderCheckinUI(res?.name || "실패", res?.message || "미등록 카드", "var(--danger)");
+    // 명단에 없는 카드일 경우에만 로딩바를 띄우고 서버 확인
+    const res = await callApi({ action: 'checkin', id: id }, true);
+    if (res && res.success) {
+      renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
+      await initQuickMap(); // 새 데이터 동기화
+    } else {
+      renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
+    }
   }
 }
 
