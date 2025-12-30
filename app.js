@@ -179,32 +179,46 @@ async function execCardChange(oldId, name) {
 
 // [7. 페이지 관리 및 관리자 모드]
 function showPage(p) {
-  // 1. 페이지 활성화 제어
+  // [1] 모든 페이지 섹션 숨기기
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  
+  // [2] 선택한 페이지만 활성화
   const targetPage = document.getElementById('page-' + p);
   if (targetPage) targetPage.classList.add('active');
 
-  // 2. 네비게이션 버튼 스타일 변경
-  document.querySelectorAll('.nav button').forEach(btn => btn.classList.toggle('active', btn.id === 'nav-' + p));
+  // [3] 네비게이션 버튼 강조 상태 업데이트
+  document.querySelectorAll('.nav button').forEach(btn => {
+    btn.classList.toggle('active', btn.id === 'nav-' + p);
+  });
 
-  // 3. ★ 모든 입력 필드 초기화 (설정 제외) ★
+  // [4] ★ 핵심: 모든 입력창(Input) 데이터 즉시 초기화 ★
+  // 설정(URL, 비번)과 NFC 브릿지만 제외하고 전부 비움
   document.querySelectorAll('input').forEach(input => {
-    if (!['nfc-bridge', 'cfg-url', 'cfg-pw'].includes(input.id) && input.type !== 'button') {
-      input.value = "";
+    const skipIds = ['nfc-bridge', 'cfg-url', 'cfg-pw'];
+    if (!skipIds.includes(input.id) && input.type !== 'button') {
+      input.value = ""; 
     }
   });
 
-  // 4. ★ 모든 결과 출력 영역 초기화 ★
-  const results = ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'];
-  results.forEach(id => {
+  // [5] ★ 핵심: 화면에 표시된 모든 조회 결과(UI) 초기화 ★
+  const resultContainers = [
+    'checkin-result',     // 출석 결과 창
+    'search-results',     // 조회 리스트
+    'point-target-area',  // 포인트 대상 창
+    'card-target-area'    // 카드 교체 대상 창
+  ];
+  resultContainers.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = "";
+    if (el) el.innerHTML = ""; // 이전 페이지의 결과물을 싹 지움
   });
 
-  // 5. 페이지별 특수 동작 (등록 페이지 필드 생성 등)
-  if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
+  // [6] 페이지별 특수 설정 (관리자 등록 필드 재생성 등)
+  if (p === 'settings') {
+    document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
+  }
   if (p === 'add') renderAddFields();
 
+  // 포커스 복구
   isUserTyping = false;
   updateFocusUI();
   setTimeout(focusNfc, 300);
