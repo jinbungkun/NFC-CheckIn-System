@@ -5,8 +5,7 @@ let isApiLoading = false;
 let currentHeaders = [];
 let quickMap = {}; // 학생 데이터를 담는 캐시
 const nfcBridge = document.getElementById('nfc-bridge');
-// 학생별 캘린더 상태 관리 객체
-const calCache = {};
+
 const PAGE_CONFIG = {
   checkin:  { inputId: 'CheckIn' },
   search:   { inputId: 'Search' },
@@ -121,44 +120,28 @@ async function doCheckin() {
   if(!id) return;
   input.value = ""; 
 
-  // 1. 한국 시간 기준 오늘 날짜 구하기 (YYYY-MM-DD)
-  const now = new Date();
-  const today = now.toLocaleDateString('en-CA'); // 'YYYY-MM-DD' 형식 보장
-
-  // 2. 로컬에서 즉시 확인 (반응성 최우선)
+  // 1. 로컬에서 먼저 확인 (반응성 최우선)
   const student = quickMap[id]; 
+  const today = new Date().toLocaleDateString('sv-SE');
   
-  if (student) {
-    // 이미 오늘 출석한 경우 -> 서버 안 가고 즉시 종료
-    if (student.lastDate === today) {
-      renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
-      return;
-    }
+  if (student && student.lastDate === today) {
+    renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
+    return;
+  }
 
-    // [핵심] 낙관적 UI: 서버 응답 기다리지 않고 성공 화면부터 띄움
-    renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
-    
-    // 로컬 데이터 즉시 업데이트 (다음 중복 태그 방지)
-    student.lastDate = today;
-    student.point = (Number(student.point) || 0) + 10;
-
-    // 서버 전송은 '로딩바 없이' 백그라운드에서 실행
-    callApi({ action: 'checkin', id: id }, false).then(res => {
-      if (!res || !res.success) {
-        // 서버 저장 실패시에만 알림
-        renderCheckinUI(student.name, "⚠️ 서버 저장 오류", "var(--danger)");
-      }
-    });
-
-  } else {
-    // 명단에 없는 카드일 경우에만 로딩바를 띄우고 서버 확인
-    const res = await callApi({ action: 'checkin', id: id }, true);
-    if (res && res.success) {
-      renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
-      await initQuickMap(); // 새 데이터 동기화
+  // 2. 서버 전송
+  const res = await callApi({ action: 'checkin', id: id }, true);
+  if (res && res.success) {
+    renderCheckinUI(res.name, res.message || "출석 성공! ✅", "var(--success)");
+    // 캐시 업데이트
+    if (quickMap[id]) {
+        quickMap[id].lastDate = today;
+        quickMap[id].point = (Number(quickMap[id].point) || 0) + 10;
     } else {
-      renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
+        await initQuickMap(); // 신규라면 전체 로드
     }
+  } else {
+    renderCheckinUI(res?.name || "실패", res?.message || "미등록 카드", "var(--danger)");
   }
 }
 
@@ -353,149 +336,56 @@ function renderAddFields() {
   });
 }
 
-// [1] 결과 렌더링 함수 (정보 | 달력 레이아웃)
+// [12. 결과 렌더링]
 function renderResults(data, type) {
-  const container = document.getElementById('search-results');
+  const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+  const container = document.getElementById(containerId);
   if (!container) return;
-  if (!data || data.length === 0) {
-    container.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">결과가 없습니다.</p>`;
-    return;
-  }
-
-  container.innerHTML = data.map(s => `
-    <div class="student-info-card" style="display: flex; flex-wrap: wrap; gap: 20px; padding: 18px; background: #2c2c2c; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444;">
-      
-      <div style="flex: 1; min-width: 220px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h3 style="margin:0; color:var(--accent); font-size: 1.3rem;">${s.이름}</h3>
-          <span class="status-badge" style="background:#444; font-size:0.75rem; padding:3px 8px; border-radius:6px;">${s.상태 || '재원'}</span>
-        </div>
-        <div style="font-size: 0.9rem; color: #ccc; line-height: 1.8;">
-          <div>🎂 <b>생일:</b> ${s.생년월일 || '-'}</div>
-          <div>📱 <b>연락처:</b> ${s.전화번호 || '-'}</div>
-          <div>💰 <b>포인트:</b> <span style="color:#FFD700;">${s.포인트} pt</span></div>
-        </div>
-        <button class="btn btn-primary" style="margin-top: 15px; width: 100%; height: 35px; font-size: 0.85rem;" onclick="loadCalendarData('${s.ID}')">
-          출석 기록 로드
-        </button>
-      </div>
-
-      <div id="cal-box-${s.ID}" style="flex: 1.5; background: #1a1a1a; border-radius: 12px; padding: 15px; border: 1px solid #333;">
-  <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-    <button class="btn-sm" onclick="changeMonth('${s.ID}', -1)">◀</button>
-    <span id="label-${s.ID}" style="font-size:0.9rem; font-weight:bold; color:var(--accent);">2025년 12월</span>
-    <button class="btn-sm" onclick="changeMonth('${s.ID}', 1)">▶</button>
-  </div>
-  <div id="grid-${s.ID}" class="month-grid">
-    </div>
-</div>
-      </div>
-
-    </div>
-  `).join('');
-}
-
-/**
- * 1. 캘린더 데이터 초기화 및 호출
- */
-async function loadCalendar(id) {
-  const now = new Date();
-  // 현재 날짜 기준으로 초기 상태 설정
-  calCache[id] = { 
-    year: now.getFullYear(), 
-    month: now.getMonth(), 
-    data: {}, // { "2025-12-31": "출석" } 형태
-    lastFetchedYear: null
-  };
   
-  await updateCalendarView(id);
-}
-
-/**
- * 2. 화면 갱신 및 연도 변경 시 서버 데이터 요청
- */
-async function updateCalendarView(id) {
-  const state = calCache[id];
-  const grid = document.getElementById(`grid-${id}`);
-  const label = document.getElementById(`label-${id}`);
-
-  // 연도가 바뀌었거나 데이터가 없으면 서버 호출
-  if (state.lastFetchedYear !== state.year) {
-    grid.innerHTML = "<div style='grid-column:1/-1; color:#555;'>Data Loading...</div>";
-    const res = await callApi({ action: 'getAttendanceHistory', id: id, year: state.year }, false);
-    
-    if (res && res.success) {
-      // 하루에 여러 데이터가 있을 경우 상태 우선순위 정제
-      state.data = processDailyStatus(res.history);
-      state.lastFetchedYear = state.year;
-    }
+  if (!data || data.length === 0) { 
+    container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
+    return; 
   }
 
-  label.innerText = `${state.year}년 ${state.month + 1}월`;
-  renderMonthGrid(id);
-}
+  container.innerHTML = data.map(s => {
+    // 1. 상태별 뱃지 색상 결정
+    const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
 
-/**
- * 3. 하루 다중 데이터 처리 (출석 < 조퇴 < 결석 순으로 중요도 부여)
- */
-function processDailyStatus(history) {
-  const map = {};
-  const priority = { "결석": 3, "조퇴": 2, "출석": 1 };
+    return `
+    <div class="student-info-card">
+      <div class="student-header">
+        <div>
+          <span style="font-size:1.2rem; font-weight:bold; color:white;">${s.이름}</span>
+          <span class="status-badge" style="background:${statusColor}; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:5px; vertical-align:middle;">${s.상태 || '재원'}</span>
+        </div>
+        <span style="color:var(--accent); font-weight:bold;">${s.포인트} pt</span>
+      </div>
+      
+      <div class="master-info-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin: 12px 0; font-size:0.9rem; color:#ccc;">
+        <div><b>🎂 생일:</b> ${s.생년월일 || '-'}</div>
+        <div><b>📱 연락처:</b> ${s.전화번호 || '-'}</div>
+        <div style="grid-column: span 2;"><b>📍 마지막 출석:</b> ${s.마지막출석 || '기록 없음'}</div>
+        <div style="grid-column: span 2; font-size:0.8rem; color:#888;"><b>🆔 ID:</b> ${s.ID}</div>
+      </div>
 
-  history.forEach(item => {
-    const prevStatus = map[item.date];
-    if (!prevStatus || priority[item.status] > priority[prevStatus]) {
-      map[item.date] = item.status;
-    }
-  });
-  return map;
-}
+      ${type === 'point' ? `
+        <div class="point-action-area" style="border-top:1px solid #444; pt:10px; margin-top:10px;">
+          <div class="point-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:5px; margin-bottom:8px; padding-top:10px;">
+            ${[10, 50, 100].map(v => `<button class="btn btn-success" onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>`).join('')}
+          </div>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="pt-inp-${s.ID}" placeholder="직접 입력" style="flex:1; padding:8px; border-radius:4px; background:#333; color:white; border:1px solid #555;">
+            <button class="btn btn-primary" onclick="updatePtManual('${s.ID}', event)">지급</button>
+          </div>
+        </div>` : ''}
 
-/**
- * 4. 실제 달력 그리드 렌더링
- */
-function renderMonthGrid(id) {
-  const state = calCache[id];
-  const grid = document.getElementById(`grid-${id}`);
-  grid.innerHTML = "";
-
-  const firstDay = new Date(state.year, state.month, 1).getDay();
-  const lastDate = new Date(state.year, state.month + 1, 0).getDate();
-
-  // 요일 헤더
-  ['일','월','화','수','목','금','토'].forEach(d => {
-    grid.innerHTML += `<div style="font-size:0.6rem; color:#555; padding-bottom:5px;">${d}</div>`;
-  });
-
-  // 시작 요일 빈칸
-  for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div></div>`;
-
-  // 날짜 칸
-  for (let d = 1; d <= lastDate; d++) {
-    const dateStr = `${state.year}-${String(state.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const status = state.data[dateStr]; // 해당 날짜의 상태 (출석, 조퇴 등)
-    
-    const cellClass = status ? `day-cell present ${status === '조퇴' ? 'early' : (status === '결석' ? 'absent' : '')}` : 'day-cell';
-    
-    grid.innerHTML += `<div class="${cellClass}" title="${status || ''}">${d}</div>`;
-  }
-}
-
-/**
- * 5. 월 변경 함수
- */
-async function changeMonth(id, delta) {
-  const state = calCache[id];
-  state.month += delta;
-
-  if (state.month > 11) {
-    state.month = 0;
-    state.year++;
-  } else if (state.month < 0) {
-    state.month = 11;
-    state.year--;
-  }
-  await updateCalendarView(id);
+      ${type === 'card' ? `
+        <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
+          <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly style="width:100%; background:rgba(255,255,255,0.1); color:white; margin-bottom:8px;">
+          <button class="btn btn-danger" style="width:100%;" onclick="execCardChange('${s.ID}', '${s.이름}')">이 학생의 카드로 교체</button>
+        </div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // [13. 포커스 및 NFC 리스너]
