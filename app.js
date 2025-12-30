@@ -120,28 +120,43 @@ async function doCheckin() {
   if(!id) return;
   input.value = ""; 
 
-  // 1. 로컬에서 먼저 확인 (반응성 최우선)
+  // 1. 로컬 데이터 확인
   const student = quickMap[id]; 
   const today = new Date().toLocaleDateString('sv-SE');
   
+  // [Case 1] 이미 오늘 출석한 경우
   if (student && student.lastDate === today) {
     renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
     return;
   }
 
-  // 2. 서버 전송
-  const res = await callApi({ action: 'checkin', id: id }, true);
-  if (res && res.success) {
-    renderCheckinUI(res.name, res.message || "출석 성공! ✅", "var(--success)");
-    // 캐시 업데이트
-    if (quickMap[id]) {
-        quickMap[id].lastDate = today;
-        quickMap[id].point = (Number(quickMap[id].point) || 0) + 10;
+  // [Case 2] 오늘 처음 출석하는 경우 (낙관적 UI 적용)
+  if (student) {
+    // A. 서버 응답 기다리지 않고 즉시 화면 표시
+    renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
+    
+    // B. 로컬 캐시 미리 업데이트 (다음 중복 태그 방지)
+    student.lastDate = today;
+    student.point = (Number(student.point) || 0) + 10;
+
+    // C. 서버 전송은 백그라운드에서 진행 (await와 로딩바 제거)
+    callApi({ action: 'checkin', id: id }, false).then(res => {
+      if (!res || !res.success) {
+        // 서버 저장 실패시에만 알림 (예외 처리)
+        renderCheckinUI(student.name, "⚠️ 서버 저장 실패! 확인 필요", "var(--danger)");
+      }
+    });
+  } 
+  // [Case 3] 아예 등록되지 않은 카드인 경우
+  else {
+    // 이때는 이름조차 모르니 로딩을 띄우고 서버에 물어봐야 함
+    const res = await callApi({ action: 'checkin', id: id }, true);
+    if (res && res.success) {
+      renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
+      await initQuickMap(); // 신규 데이터 동기화
     } else {
-        await initQuickMap(); // 신규라면 전체 로드
+      renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
     }
-  } else {
-    renderCheckinUI(res?.name || "실패", res?.message || "미등록 카드", "var(--danger)");
   }
 }
 
