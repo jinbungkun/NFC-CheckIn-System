@@ -1,3 +1,4 @@
+// [상태 관리 변수]
 let isAdmin = false;
 let isUserTyping = false;
 let isApiLoading = false;
@@ -11,10 +12,28 @@ const PAGE_CONFIG = {
   search:   { inputId: 'Search' },
   point:    { inputId: 'Point' },
   card:     { inputId: 'Card' },
-  register: { inputId: 'Register' } // 학생 추가(Register) 페이지의 ID 입력 필드용
+  register: { inputId: 'Register' } 
 };
 
-// [초기화] 데이터 로드 (기능 유지)
+// [1. 초기화 및 페이지 로드]
+window.onload = async () => {
+  const url = localStorage.getItem('GAS_URL');
+  isAdmin = localStorage.getItem('IS_ADMIN_ACTIVE') === 'true';
+
+  if (!url) {
+    showPage('settings'); // URL 없으면 설정창으로 강제 이동
+  } else {
+    await refreshSchema();
+    await initQuickMap();
+  }
+
+  updateAdminUI();
+  initFocusGuard();
+  updateFocusUI();
+  focusNfc();
+  setInterval(focusNfc, 2000); // 2초마다 포커스 자동 복구
+};
+
 async function initQuickMap() {
   const res = await callApi({ action: 'getQuickMap' }, false);
   if (res && res.success) {
@@ -23,10 +42,11 @@ async function initQuickMap() {
   }
 }
 
-// [API] 통신 함수 (기능 및 안정성 유지)
+// [2. API 통신 함수]
 async function callApi(data, showLoader = true) {
   const url = localStorage.getItem('GAS_URL');
   const loader = document.getElementById('loader');
+  
   if(!url && data.action !== 'initSheet') { showPage('settings'); return null; }
   
   if (showLoader) {
@@ -50,14 +70,13 @@ async function callApi(data, showLoader = true) {
   }
 }
 
-// [조회 핵심] 상황에 따라 서버/로컬 소스를 선택하여 데이터 반환
+// [3. 데이터 조회 및 검색 로직]
 async function fetchData(query = '', source = 'LOCAL') {
   if (source === 'SERVER') {
     const res = await callApi({ action: 'searchName', name: query }, true);
     return res?.data || [];
   }
   
-  // LOCAL 모드: quickMap 검색
   const q = query.toLowerCase();
   return Object.entries(quickMap)
     .filter(([id, s]) => s.name.toLowerCase().includes(q) || id.includes(q))
@@ -66,19 +85,16 @@ async function fetchData(query = '', source = 'LOCAL') {
     }));
 }
 
-// [기능] 이름/ID 검색 (페이지 특성에 따라 소스 결정)
 async function findStudent(pageType) {
   const config = PAGE_CONFIG[pageType];
   const query = document.getElementById(config.inputId).value.trim();
   if (!query) return;
 
-  // Search와 Card 교체는 'SERVER'에서 최신 정보를, 나머지는 'LOCAL' 사용
   const source = (pageType === 'search' || pageType === 'card') ? 'SERVER' : 'LOCAL';
   const data = await fetchData(query, source);
   renderResults(data, pageType);
 }
 
-// [기능] NFC 태그 검색
 async function findByNfc(id, pageType) {
   const source = (pageType === 'search' || pageType === 'card') ? 'SERVER' : 'LOCAL';
   const data = await fetchData('', source); 
@@ -91,7 +107,7 @@ async function findByNfc(id, pageType) {
   }
 }
 
-// [기능] 출석 체크 (낙관적 UI 및 로컬 업데이트 유지)
+// [4. 출석 체크 (낙관적 UI)]
 function doCheckin() {
   const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
   const id = input.value.trim();
@@ -122,7 +138,25 @@ function doCheckin() {
   }
 }
 
-// [포인트] 업데이트 (로컬 선반영 유지)
+function renderCheckinUI(name, msg, color) {
+  const target = document.getElementById('checkin-result');
+  if (target) {
+    target.innerHTML = `
+      <div class="student-info-card" style="text-align:center; border: 2px solid ${color};">
+        <h3 style="color:${color}; margin: 5px 0;">${name}</h3>
+        <p style="margin: 5px 0; font-weight: bold;">${msg}</p>
+      </div>`;
+  }
+}
+
+// [5. 포인트 관리]
+function updatePtManual(id, event) {
+  const input = document.getElementById(`pt-inp-${id}`);
+  if (!input || !input.value) return alert("포인트를 입력하세요");
+  updatePt(id, input.value, event);
+  input.value = "";
+}
+
 async function updatePt(id, amt, event) {
   const amount = Number(amt);
   if (isNaN(amount)) return;
@@ -139,28 +173,102 @@ async function updatePt(id, amt, event) {
   callApi({ action: 'updatePoint', id: id, amount: amount }, false);
 }
 
-// [NFC] 입력 처리 브릿지
-function processNfc(val) {
-  const activePage = document.querySelector('.page.active');
-  if (!activePage) return;
-  const pageType = activePage.id.replace('page-', '');
+// [6. 관리자 기능: 학생 등록 및 카드 교체]
+async function registerStudent() {
+  const fields = {};
+  currentHeaders.forEach(h => {
+    const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+    if (el) fields[h] = el.value.trim();
+  });
 
-  if (pageType === 'add') {
-    // 학생 등록 시 ID 필드(Register)에 값 입력
-    const idInp = document.getElementById(PAGE_CONFIG.register.inputId);
-    if (idInp) idInp.value = val;
-  } else if (pageType === 'checkin') {
-    document.getElementById(PAGE_CONFIG.checkin.inputId).value = val;
-    doCheckin();
-  } else if (pageType === 'card' && document.getElementById('new-card-input')) {
-    // 카드 교체 중 새 카드 입력 시
-    document.getElementById('new-card-input').value = val;
-  } else if (PAGE_CONFIG[pageType]) {
-    findByNfc(val, pageType);
+  if(!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
+
+  const res = await callApi({ action: 'add', fields: fields }, true);
+  if(res && res.success) { 
+    alert("등록 완료!"); 
+    await initQuickMap();
+    showPage('checkin'); 
+  } else alert("실패: " + (res ? res.message : "서버 오류"));
+}
+
+async function execCardChange(oldId, name) {
+  const newId = document.getElementById('new-card-input').value;
+  if(!newId) return alert("새 카드를 태그하세요.");
+  const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId });
+  if(res && res.success) { 
+    alert("교체 완료"); 
+    await initQuickMap(); 
+    showPage('checkin'); 
   }
 }
 
-// [UI] 화면 렌더링 및 보조 기능들 (기존 기능 100% 유지)
+// [7. 관리자 및 설정 관리]
+async function toggleAdmin() {
+  if (!isAdmin) {
+    const pw = prompt("관리자 비밀번호");
+    if (!pw) return;
+    const res = await callApi({ action: 'verifyPw', pw: pw });
+    if (res && res.success) {
+      isAdmin = true;
+      localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
+      updateAdminUI();
+      await refreshSchema(true);
+    } else alert("비밀번호 오류");
+  } else {
+    isAdmin = false;
+    localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
+    updateAdminUI();
+    showPage('checkin');
+  }
+}
+
+function updateAdminUI() {
+  document.querySelectorAll('.admin-only-btn').forEach(el => el.style.display = isAdmin ? 'inline-block' : 'none');
+  const status = document.getElementById('mode-status');
+  if (status) {
+    status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
+    status.className = isAdmin ? "admin-active" : "";
+  }
+  const lockBtn = document.querySelector('.admin-lock-btn');
+  if (lockBtn) lockBtn.innerText = isAdmin ? "🔓" : "🔒";
+}
+
+async function saveSettings() {
+  const url = document.getElementById('cfg-url').value.trim();
+  localStorage.setItem('GAS_URL', url);
+  const res = await callApi({ action: 'initSheet', pw: document.getElementById('cfg-pw').value });
+  if(res) { 
+    alert("연결 성공!"); 
+    await refreshSchema(true); 
+    await initQuickMap(); 
+    showPage('checkin');
+  }
+}
+
+// [8. UI 렌더링 및 페이지 전환]
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  const targetPage = document.getElementById('page-' + p);
+  if (targetPage) targetPage.classList.add('active');
+
+  document.querySelectorAll('.nav button').forEach(btn => {
+    btn.classList.toggle('active', btn.id === 'nav-' + p);
+  });
+
+  document.querySelectorAll('input').forEach(input => {
+    if (!['nfc-bridge', 'cfg-url', 'cfg-pw'].includes(input.id) && input.type !== 'button') {
+      input.value = "";
+    }
+  });
+
+  if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
+  if (p === 'add') renderAddFields();
+
+  isUserTyping = false;
+  updateFocusUI();
+  setTimeout(focusNfc, 300);
+}
+
 function renderResults(data, type) {
   const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
   const container = document.getElementById(containerId);
@@ -202,6 +310,86 @@ function renderResults(data, type) {
   }).join('');
 }
 
-/** * 기타 UI 보조 함수(updateFocusUI, focusNfc, initFocusGuard, toggleAdmin, showPage, 
- * renderAddFields, refreshSchema 등)는 기존 작성된 최신 기능을 그대로 유지합니다. 
- **/
+async function refreshSchema(force = false) {
+  if (!force && currentHeaders.length > 0) return renderAddFields();
+  const res = await callApi({ action: 'getSchema' });
+  if (res?.headers) {
+    currentHeaders = res.headers;
+    renderAddFields();
+  }
+}
+
+function renderAddFields() {
+  const container = document.getElementById('dynamic-add-fields');
+  if (!container) return;
+  container.innerHTML = "";
+  currentHeaders.forEach(header => {
+    if (['포인트', '등록일', '마지막출석'].includes(header)) return;
+    const input = document.createElement('input');
+    input.placeholder = header;
+    if (header === 'ID') {
+      input.id = PAGE_CONFIG.register.inputId; 
+      input.readOnly = true;
+      input.placeholder = "ID (카드를 태그하세요)";
+    } else {
+      input.id = `field-${header}`;
+    }
+    container.appendChild(input);
+  });
+  initFocusGuard();
+}
+
+// [9. 포커스 및 NFC 관리]
+function updateFocusUI() {
+  const indicator = document.getElementById('focus-indicator');
+  if (!indicator) return;
+  indicator.innerText = isUserTyping ? "⌨️ 입력 중" : "📡 리더기 대기";
+  indicator.className = isUserTyping ? "focus-typing" : "focus-nfc";
+}
+
+function focusNfc() {
+  if (isUserTyping || isApiLoading) return;
+  if (document.activeElement.tagName !== 'INPUT') {
+    nfcBridge.focus({ preventScroll: true });
+  }
+}
+
+function initFocusGuard() {
+  document.querySelectorAll('input').forEach(el => {
+    if (el.id === 'nfc-bridge') return;
+    el.addEventListener('focus', () => { isUserTyping = true; updateFocusUI(); });
+    el.addEventListener('blur', () => { 
+      setTimeout(() => { isUserTyping = false; updateFocusUI(); focusNfc(); }, 500); 
+    });
+  });
+}
+
+nfcBridge.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') {
+    const val = nfcBridge.value.trim();
+    if(val) processNfc(val);
+    nfcBridge.value = "";
+  }
+});
+
+function processNfc(val) {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageType = activePage.id.replace('page-', '');
+
+  if (pageType === 'add') {
+    const idInp = document.getElementById(PAGE_CONFIG.register.inputId);
+    if (idInp) idInp.value = val;
+  } else if (pageType === 'checkin') {
+    document.getElementById(PAGE_CONFIG.checkin.inputId).value = val;
+    doCheckin();
+  } else if (pageType === 'card' && document.getElementById('new-card-input')) {
+    document.getElementById('new-card-input').value = val;
+  } else if (PAGE_CONFIG[pageType]) {
+    findByNfc(val, pageType);
+  }
+}
+
+document.body.onclick = (e) => {
+  if(e.target.tagName !== 'INPUT') { isUserTyping = false; updateFocusUI(); focusNfc(); }
+};
