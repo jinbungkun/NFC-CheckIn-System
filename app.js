@@ -16,17 +16,23 @@ const PAGE_CONFIG = {
 
 // [1. 초기화]
 window.onload = async () => {
-  const url = localStorage.getItem('GAS_URL');
-  isAdmin = localStorage.getItem('IS_ADMIN_ACTIVE') === 'true';
+  // 1. 로컬 스토리지에서 즉시 관리자 여부 확인
+  const savedAdminStatus = localStorage.getItem('IS_ADMIN_ACTIVE');
+  isAdmin = (savedAdminStatus === 'true'); // 불리언 타입으로 확실히 변환
 
+  // 2. 서버 통신(await) 전에 UI부터 관리자 상태로 강제 고정
+  // 이 코드가 서버 응답을 기다리기 전에 실행되어야 '학생용'으로 안 보입니다.
+  updateAdminUI(); 
+
+  const url = localStorage.getItem('GAS_URL');
   if (!url) {
     showPage('settings'); 
   } else {
+    // UI 고정 후 백그라운드에서 데이터 로드
     await refreshSchema();
     await initQuickMap();
   }
 
-  updateAdminUI();
   initFocusGuard();
   updateFocusUI();
   focusNfc();
@@ -224,21 +230,32 @@ function showPage(p) {
   setTimeout(focusNfc, 300);
 }
 
-async function toggleAdmin() {
-  if (!isAdmin) {
-    const pw = prompt("관리자 비밀번호");
-    if (!pw) return;
-    const res = await callApi({ action: 'verifyPw', pw: pw });
-    if (res && res.success) {
-      isAdmin = true;
-      localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
-      updateAdminUI();
-      await refreshSchema(true);
-    } else alert("비밀번호 오류: [" + pw + "]");
-  } else {
-    isAdmin = false;
-    localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
-    updateAdminUI();
+// [2. UI 업데이트 및 페이지 강제 전환 로직]
+function updateAdminUI() {
+  // (1) 관리자 전용 버튼 표시/숨김 처리
+  document.querySelectorAll('.admin-only-btn').forEach(el => {
+    el.style.display = isAdmin ? 'inline-block' : 'none';
+  });
+
+  // (2) 상단/하단 상태 텍스트를 관리자 여부에 따라 즉시 변경
+  const status = document.getElementById('mode-status');
+  if (status) {
+    // 로컬 데이터가 true면 여기서 즉시 "관리자 모드"로 고정됩니다.
+    status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
+    status.className = isAdmin ? "admin-active" : "";
+  }
+
+  // (3) 자물쇠 아이콘 업데이트
+  const lockBtn = document.querySelector('.admin-lock-btn');
+  if (lockBtn) {
+    lockBtn.innerText = isAdmin ? "🔓" : "🔒";
+  }
+
+  // (4) ★중요: 관리자 상태인데 학생용 첫 페이지만 보이는 것을 방지★
+  // 관리자라면 '조회'나 '등록' 등 관리자 메뉴를 그대로 유지하게 하거나
+  // 권한이 없는데 관리자 페이지에 있으면 '출석'으로 보냅니다.
+  const activePage = document.querySelector('.page.active');
+  if (!isAdmin && activePage && activePage.id !== 'page-checkin' && activePage.id !== 'page-settings') {
     showPage('checkin');
   }
 }
