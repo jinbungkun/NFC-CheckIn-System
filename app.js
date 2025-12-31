@@ -353,7 +353,7 @@ function showPage(p) {
   if (p === 'settings') {
     document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
   }
-  if (p === 'add') refreshSchema(true);
+  if (p === 'add') refreshSchema(false);
 
   isUserTyping = false;
   updateFocusUI();
