@@ -405,9 +405,18 @@ async function saveSettings() {
 }
 
 async function refreshSchema(force = false) {
-  if (!force && currentHeaders.length > 0) return renderAddFields();
+  // 이미 헤더가 있고 강제 새로고침이 아니라면 서버 요청 없이 즉시 렌더링
+  if (!force && currentHeaders && currentHeaders.length > 0) {
+    renderAddFields();
+    return;
+  }
+
+  // 헤더가 없거나 force(새로고침)인 경우에만 서버 호출
   const res = await callApi({ action: 'getSchema' });
-  if (res?.headers) { currentHeaders = res.headers; renderAddFields(); }
+  if (res && res.headers) {
+    currentHeaders = res.headers;
+    renderAddFields();
+  }
 }
 
 function renderAddFields() {
