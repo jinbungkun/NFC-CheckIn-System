@@ -1,45 +1,122 @@
-:root { 
-  --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --success: #10b981; 
-  --text: #f8fafc; --muted: #94a3b8; --accent: #f59e0b; --danger: #ef4444; 
+/* 1. 대시보드 카드 디자인 통일 (기존 변수 활용) */
+.student-dashboard-card {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--card); /* 기존 다크블루 톤으로 통일 */
+    border-radius: 20px;
+    margin-top: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #334155;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
-body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+/* 2. 대시보드 내부 레이아웃 */
+.dash-info { 
+    flex: 1; 
+    padding: 20px; 
+    border-right: 1px solid #334155; 
+    min-width: 250px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
 
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.dash-calendar { 
+    flex: 1.5; 
+    padding: 20px; 
+    background: rgba(15, 23, 42, 0.5); /* 본체보다 살짝 더 어두운 배경 */
+    min-width: 300px; 
+}
 
-#mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #1e293b; color: var(--muted); font-weight: bold; }
-#mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
+/* 3. 학생 정보 텍스트 디테일 */
+.student-name { 
+    font-size: 1.4rem; 
+    font-weight: bold; 
+    color: var(--accent); 
+    display: block;
+    margin-bottom: 5px;
+}
 
-#focus-indicator { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; transition: all 0.3s; }
-.focus-nfc { background: var(--success); color: white; }
-.focus-typing { background: var(--accent); color: white; }
+.info-header { margin-bottom: 15px; }
+.info-body { margin-bottom: 20px; }
+.info-item { font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
+.point-val { color: var(--accent); font-weight: bold; }
 
-.admin-lock-btn { background: var(--card); border: none; color: white; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
+.btn-manual-checkin {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
 
-.nav { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 14px; overflow-x: auto; }
-.nav::-webkit-scrollbar { display: none; }
-.nav button { flex: none; width: 75px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
-.nav button.active { background: var(--primary); color: white; }
+.btn-manual-checkin:active { opacity: 0.7; }
 
-.admin-only-btn { display: none; } 
+/* 4. 달력 그리드 정교화 */
+.cal-nav { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 15px;
+}
 
-.page { display: none; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-.page.active { display: block !important; }
+.cal-btn {
+    background: #334155;
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+}
 
-input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
-input:focus { border-color: var(--primary); outline: none; background: #000; }
-input[readonly] { background: #1e293b; color: var(--muted); cursor: not-allowed; }
+.cal-label { font-weight: bold; color: var(--text); font-size: 1rem; }
 
-.btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 8px; }
-.btn-primary { background: var(--primary); color: white; }
-.btn-success { background: var(--success); color: white; }
-.btn-danger { background: var(--danger); color: white; }
+.cal-grid { 
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr); 
+    gap: 6px; 
+    text-align: center; 
+}
 
-.student-info-card { background: #334155; padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid #475569; }
-.student-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #475569; padding-bottom: 5px; }
-.point-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.day-header { 
+    font-size: 0.75rem; 
+    color: var(--muted); 
+    font-weight: bold;
+    padding-bottom: 8px;
+}
 
-#loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
-#nfc-bridge { position: absolute; left: -9999px; opacity: 0; }
-.detail-info { font-size: 0.85rem; color: var(--muted); margin: 2px 0; }
+.day-num { 
+    aspect-ratio: 1; /* 정사각형 유지 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem; 
+    color: var(--muted); 
+    background: rgba(255, 255, 255, 0.05); 
+    border-radius: 8px; 
+    transition: all 0.2s;
+}
 
+/* 5. 출석 도장 (핵심!) */
+.is-present { 
+    background: var(--success) !important; 
+    color: white !important; 
+    font-weight: bold; 
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    position: relative;
+}
+
+/* 오늘 날짜 표시 */
+.is-today {
+    border: 2px solid var(--primary);
+}
+
+/* 모바일 대응: 화면이 좁아지면 달력을 아래로 보냄 */
+@media (max-width: 600px) {
+    .dash-info { border-right: none; border-bottom: 1px solid #334155; }
+}
