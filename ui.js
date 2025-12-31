@@ -14,54 +14,57 @@ const UI = {
 
     // 2. 검색/조회 결과 대시보드 (정보 + 달력 레이아웃)
     renderResults(data, type) {
-        const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-        const container = document.getElementById(containerId);
-        if (!container) return;
+    const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (!data || data.length === 0) { 
+        container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
+        return; 
+    }
+
+    container.innerHTML = data.map(s => {
+        const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
         
-        if (!data || data.length === 0) { 
-            container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
-            return; 
-        }
-
-        container.innerHTML = data.map(s => {
-            const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
-            
-            // 조회 페이지일 경우 (왼쪽 정보, 오른쪽 달력 구조)
-            if (type === 'search') {
-                return `
-                <div class="student-dashboard-card">
-                    <div class="dash-info">
-                        <div class="info-header">
-                            <span class="student-name">${s.이름}</span>
-                            <span class="status-badge" style="background:${statusColor}">${s.상태 || '재원'}</span>
-                        </div>
-                        <div class="info-body">
-                            <div class="info-item">🎂 ${s.생년월일 || '-'}</div>
-                            <div class="info-item">📱 ${s.전화번호 || '-'}</div>
-                            <div class="info-item">💰 <span class="point-val">${s.포인트} pt</span></div>
-                        </div>
-                        <button class="btn-manual-checkin" onclick="doManualCheckin('${s.ID}')">이 학생 출석하기</button>
-                    </div>
-                    <div class="dash-calendar">
-                        <div class="cal-nav">
-                            <button onclick="changeMonthUI('${s.ID}', -1)">◀</button>
-                            <span id="cal-label-${s.ID}" class="cal-label"></span>
-                            <button onclick="changeMonthUI('${s.ID}', 1)">▶</button>
-                        </div>
-                        <div id="grid-${s.ID}" class="cal-grid"></div>
-                    </div>
-                </div>`;
-            }
-
-            // 포인트/카드 교체 페이지일 경우 (기존 스타일 유지)
-            return this.renderSimpleCard(s, type, statusColor);
-        }).join('');
-
-        // 달력 초기화 (조회 페이지일 때만)
         if (type === 'search') {
-            data.forEach(s => initCalendarUI(s.ID));
+            return `
+            <div class="student-dashboard-card">
+                <div class="dash-info">
+                    <div class="info-header">
+                        <span class="student-name">${s.이름}</span>
+                        <span class="status-badge" style="background:${statusColor}">${s.상태 || '재원'}</span>
+                    </div>
+                    <div class="info-body">
+                        <div class="info-item">🎂 ${s.생년월일 || '-'}</div>
+                        <div class="info-item">📱 ${s.전화번호 || '-'}</div>
+                        <div class="info-item">💰 <span class="point-val">${s.포인트} pt</span></div>
+                    </div>
+                    <button class="btn-manual-checkin" onclick="doManualCheckin('${s.ID}')">이 학생 출석하기</button>
+                </div>
+                <div class="dash-calendar">
+                    <div class="cal-nav">
+                        <button class="cal-btn" onclick="changeMonthUI('${s.ID}', -1)">◀</button>
+                        <span class="cal-label" id="cal-label-${s.ID}">0000년 00월</span>
+                        <button class="cal-btn" onclick="changeMonthUI('${s.ID}', 1)">▶</button>
+                    </div>
+                    <div class="cal-grid" id="grid-${s.ID}">
+                        <div style="grid-column: span 7; padding: 20px; color: var(--muted); font-size: 0.8rem;">데이터 로딩 중...</div>
+                    </div>
+                </div>
+            </div> `;
         }
-    },
+
+        return this.renderSimpleCard(s, type, statusColor);
+    }).join('');
+
+    if (type === 'search') {
+        // 검색 결과가 여러 명일 경우를 대비해 순차적으로 초기화
+        data.forEach(s => {
+            // DOM이 완전히 그려진 후 실행되도록 setTimeout 사용
+            setTimeout(() => initCalendarUI(s.ID), 10);
+        });
+    }
+},
 
     // 포인트/카드 교체용 심플 카드
     renderSimpleCard(s, type, statusColor) {

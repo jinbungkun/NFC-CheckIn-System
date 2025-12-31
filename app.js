@@ -264,9 +264,25 @@ async function drawGrid(id) {
     if (!grid || !label) return;
 
     label.innerText = `${state.year}년 ${state.month + 1}월`;
-    grid.innerHTML = "";
+    
+    // 1. 달력 영역에 로딩 메시지 표시 (기존 내용 지우고 로딩 띄움)
+    grid.innerHTML = "<div style='grid-column: span 7; padding: 20px; color: var(--muted);'>데이터 불러오는 중...</div>";
 
-    // 1. 요일 헤더 생성 (기존과 동일)
+    // 2. 1년치 데이터 가져오기 (연도가 바뀔 때만 서버 호출)
+    if (!state.history || state.historyYear !== state.year) {
+        const res = await callApi({ 
+            action: 'getHistory', 
+            id: id, 
+            year: state.year 
+        }, false); // 전체 화면 로더 대신 부분 로딩 사용
+        
+        state.history = (res && res.success) ? res.history : [];
+        state.historyYear = state.year;
+    }
+
+    // 3. 로딩 메시지 제거 후 실제 그리드 그리기
+    grid.innerHTML = "";
+    
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     days.forEach(d => {
         const dDiv = document.createElement('div');
@@ -275,44 +291,22 @@ async function drawGrid(id) {
         grid.appendChild(dDiv);
     });
 
-    // 2. 1년치 데이터 가져오기 및 캐싱
-    // 캐시에 데이터가 없거나, 저장된 데이터의 연도가 현재 달력 연도와 다를 때만 서버 호출
-    if (!state.history || state.historyYear !== state.year) {
-        const res = await callApi({ 
-            action: 'getHistory', 
-            id: id, 
-            year: state.year 
-        }, false);
-        
-        state.history = (res && res.success) ? res.history : [];
-        state.historyYear = state.year; // 현재 캐싱된 데이터의 연도 저장
-    }
-
     const attendanceSet = new Set(state.history);
     const firstDay = new Date(state.year, state.month, 1).getDay();
     const lastDate = new Date(state.year, state.month + 1, 0).getDate();
     const todayStr = new Date().toLocaleDateString('sv-SE');
 
-    // 3. 빈칸 생성
     for (let i = 0; i < firstDay; i++) {
         grid.appendChild(document.createElement('div'));
     }
 
-    // 4. 날짜 생성 및 도장 찍기
     for (let d = 1; d <= lastDate; d++) {
         const dDiv = document.createElement('div');
         dDiv.className = 'day-num';
         dDiv.innerText = d;
-
         const currentFullDate = `${state.year}-${String(state.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
         if (currentFullDate === todayStr) dDiv.classList.add('is-today');
-
-        // 캐시된 데이터(Set)에서 즉시 확인 (매우 빠름)
-        if (attendanceSet.has(currentFullDate)) {
-            dDiv.classList.add('is-present');
-        }
-
+        if (attendanceSet.has(currentFullDate)) dDiv.classList.add('is-present');
         grid.appendChild(dDiv);
     }
 }
