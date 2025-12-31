@@ -1,122 +1,84 @@
-/* 1. 대시보드 카드 디자인 통일 (기존 변수 활용) */
+:root { 
+  --bg: #0f172a; 
+  --card: #1e293b; 
+  --primary: #3b82f6; 
+  --success: #10b981; 
+  --text: #f8fafc; 
+  --muted: #94a3b8; 
+  --accent: #f59e0b; 
+  --danger: #ef4444; 
+}
+
+body { 
+  font-family: -apple-system, 'Pretendard', sans-serif; 
+  background: var(--bg); 
+  color: var(--text); 
+  margin: 0; 
+  padding: 15px; 
+  line-height: 1.5;
+}
+
+/* 헤더 및 상단 상태바 */
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+#mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: var(--card); color: var(--muted); font-weight: bold; }
+#mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
+#focus-indicator { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; background: var(--card); color: var(--muted); }
+
+/* 네비게이션 */
+.nav { display: flex; gap: 8px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 16px; overflow-x: auto; }
+.nav button { flex: 1; min-width: 70px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.2s; }
+.nav button.active { background: var(--primary); color: white; }
+
+/* 페이지 공통 */
+.page { display: none; background: var(--card); padding: 25px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+.page.active { display: block !important; }
+h2 { margin-top: 0; font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+/* 입력창 및 버튼 */
+input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
+input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+.btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-success { background: var(--success); color: white; }
+.btn:active { transform: scale(0.98); opacity: 0.9; }
+
+/* 🌟 정보 조회 대시보드 (2분할 카드) */
 .student-dashboard-card {
-    display: flex;
-    flex-wrap: wrap;
-    background: var(--card); /* 기존 다크블루 톤으로 통일 */
-    border-radius: 20px;
-    margin-top: 15px;
-    margin-bottom: 20px;
-    border: 1px solid #334155;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  display: flex;
+  flex-wrap: wrap;
+  background: rgba(255,255,255,0.03);
+  border-radius: 20px;
+  margin-top: 20px;
+  border: 1px solid #334155;
+  overflow: hidden;
 }
 
-/* 2. 대시보드 내부 레이아웃 */
-.dash-info { 
-    flex: 1; 
-    padding: 20px; 
-    border-right: 1px solid #334155; 
-    min-width: 250px; 
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
+.dash-info { flex: 1; padding: 20px; border-right: 1px solid #334155; min-width: 250px; }
+.dash-calendar { flex: 1.5; padding: 20px; background: rgba(0,0,0,0.2); min-width: 300px; }
 
-.dash-calendar { 
-    flex: 1.5; 
-    padding: 20px; 
-    background: rgba(15, 23, 42, 0.5); /* 본체보다 살짝 더 어두운 배경 */
-    min-width: 300px; 
-}
+.student-name { font-size: 1.4rem; font-weight: bold; color: var(--accent); display: block; margin-bottom: 10px; }
+.info-item { font-size: 0.9rem; color: var(--muted); margin: 6px 0; display: flex; align-items: center; gap: 6px; }
 
-/* 3. 학생 정보 텍스트 디테일 */
-.student-name { 
-    font-size: 1.4rem; 
-    font-weight: bold; 
-    color: var(--accent); 
-    display: block;
-    margin-bottom: 5px;
-}
+/* 📅 달력 스타일 */
+.cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.cal-label { font-weight: bold; color: var(--text); }
+.cal-btn { background: #334155; color: white; border: none; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+.day-header { font-size: 0.7rem; color: #64748b; font-weight: bold; padding: 5px 0; }
+.day-num { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--muted); background: rgba(255,255,255,0.05); border-radius: 8px; }
 
-.info-header { margin-bottom: 15px; }
-.info-body { margin-bottom: 20px; }
-.info-item { font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
-.point-val { color: var(--accent); font-weight: bold; }
+/* 출석 표시 */
+.is-present { background: var(--success) !important; color: white !important; font-weight: bold; box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
 
-.btn-manual-checkin {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
+/* 일반 결과 카드 (포인트, 카드교체용) */
+.student-info-card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px; margin-top: 15px; border: 1px solid #334155; }
+.student-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
 
-.btn-manual-checkin:active { opacity: 0.7; }
+/* 로더 */
+#loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
 
-/* 4. 달력 그리드 정교화 */
-.cal-nav { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 15px;
-}
-
-.cal-btn {
-    background: #334155;
-    color: white;
-    border: none;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.cal-label { font-weight: bold; color: var(--text); font-size: 1rem; }
-
-.cal-grid { 
-    display: grid; 
-    grid-template-columns: repeat(7, 1fr); 
-    gap: 6px; 
-    text-align: center; 
-}
-
-.day-header { 
-    font-size: 0.75rem; 
-    color: var(--muted); 
-    font-weight: bold;
-    padding-bottom: 8px;
-}
-
-.day-num { 
-    aspect-ratio: 1; /* 정사각형 유지 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.85rem; 
-    color: var(--muted); 
-    background: rgba(255, 255, 255, 0.05); 
-    border-radius: 8px; 
-    transition: all 0.2s;
-}
-
-/* 5. 출석 도장 (핵심!) */
-.is-present { 
-    background: var(--success) !important; 
-    color: white !important; 
-    font-weight: bold; 
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
-    position: relative;
-}
-
-/* 오늘 날짜 표시 */
-.is-today {
-    border: 2px solid var(--primary);
-}
-
-/* 모바일 대응: 화면이 좁아지면 달력을 아래로 보냄 */
+/* 모바일 대응 */
 @media (max-width: 600px) {
-    .dash-info { border-right: none; border-bottom: 1px solid #334155; }
+  .dash-info { border-right: none; border-bottom: 1px solid #334155; }
+  .nav button { width: auto; padding: 12px 15px; }
 }
