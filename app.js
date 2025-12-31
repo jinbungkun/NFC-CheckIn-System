@@ -247,13 +247,17 @@ async function execCardChange(oldId, name) {
 // [9. 달력 그리기 로직]
 function initCalendarUI(id) {
     const now = new Date();
-    if (!calCache[id]) {
-        calCache[id] = { year: now.getFullYear(), month: now.getMonth(), history: [] };
-    }
+    // 캐시 객체 초기화 시 데이터 저장소 추가
+    calCache[id] = { 
+        year: now.getFullYear(), 
+        month: now.getMonth(),
+        history: null,      // 서버에서 받은 날짜 배열 저장
+        historyYear: null   // 어떤 연도의 데이터인지 기록
+    };
     drawGrid(id);
 }
 
-function drawGrid(id) {
+async function drawGrid(id) {
     const state = calCache[id];
     const grid = document.getElementById(`grid-${id}`);
     const label = document.getElementById(`cal-label-${id}`);
@@ -262,6 +266,7 @@ function drawGrid(id) {
     label.innerText = `${state.year}년 ${state.month + 1}월`;
     grid.innerHTML = "";
 
+    // 1. 요일 헤더 생성 (기존과 동일)
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     days.forEach(d => {
         const dDiv = document.createElement('div');
@@ -270,18 +275,44 @@ function drawGrid(id) {
         grid.appendChild(dDiv);
     });
 
+    // 2. 1년치 데이터 가져오기 및 캐싱
+    // 캐시에 데이터가 없거나, 저장된 데이터의 연도가 현재 달력 연도와 다를 때만 서버 호출
+    if (!state.history || state.historyYear !== state.year) {
+        const res = await callApi({ 
+            action: 'getHistory', 
+            id: id, 
+            year: state.year 
+        }, false);
+        
+        state.history = (res && res.success) ? res.history : [];
+        state.historyYear = state.year; // 현재 캐싱된 데이터의 연도 저장
+    }
+
+    const attendanceSet = new Set(state.history);
     const firstDay = new Date(state.year, state.month, 1).getDay();
     const lastDate = new Date(state.year, state.month + 1, 0).getDate();
+    const todayStr = new Date().toLocaleDateString('sv-SE');
 
+    // 3. 빈칸 생성
     for (let i = 0; i < firstDay; i++) {
         grid.appendChild(document.createElement('div'));
     }
 
+    // 4. 날짜 생성 및 도장 찍기
     for (let d = 1; d <= lastDate; d++) {
         const dDiv = document.createElement('div');
         dDiv.className = 'day-num';
         dDiv.innerText = d;
-        // 나중에 실제 history 연동 시 여기서 'is-present' 클래스 추가 가능
+
+        const currentFullDate = `${state.year}-${String(state.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+        if (currentFullDate === todayStr) dDiv.classList.add('is-today');
+
+        // 캐시된 데이터(Set)에서 즉시 확인 (매우 빠름)
+        if (attendanceSet.has(currentFullDate)) {
+            dDiv.classList.add('is-present');
+        }
+
         grid.appendChild(dDiv);
     }
 }
@@ -291,6 +322,9 @@ function changeMonthUI(id, delta) {
     state.month += delta;
     if (state.month > 11) { state.month = 0; state.year++; }
     if (state.month < 0) { state.month = 11; state.year--; }
+    
+    // drawGrid 내부에서 연도가 같으면 캐시를 사용하므로 
+    // 서버 호출 없이 즉시 화면이 갱신됩니다.
     drawGrid(id);
 }
 
