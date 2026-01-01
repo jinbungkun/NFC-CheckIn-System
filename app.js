@@ -1,203 +1,262 @@
-// [상태 관리 변수]
+/* ==========================================================================
+   [Module 1] 설정 및 전역 상태 관리
+   - 페이지 설정, 관리자 여부, 캐시 데이터 등 전역 변수 정의
+   ========================================================================== */
+const PAGE_CONFIG = {
+    checkin:  { inputId: 'CheckIn' },
+    search:   { inputId: 'Search' },
+    point:    { inputId: 'Point' },
+    card:     { inputId: 'Card' },
+    register: { inputId: 'Register' },
+    schedule: { inputId: 'page-schedule-status' }
+};
+
+// 상태 관리 변수
 let isAdmin = false;
 let isUserTyping = false;
 let isApiLoading = false;
 let currentHeaders = [];
-let quickMap = {}; // 학생 데이터를 담는 캐시
+let quickMap = {};       // 학생 전체 데이터 캐시
+const calCache = {};     // 달력 데이터 캐시
 const nfcBridge = document.getElementById('nfc-bridge');
-const calCache = {}; // 달력 데이터 캐시
 
-const PAGE_CONFIG = {
-  checkin:  { inputId: 'CheckIn' },
-  search:   { inputId: 'Search' },
-  point:    { inputId: 'Point' },
-  card:     { inputId: 'Card' },
-  register: { inputId: 'Register' } 
-};
-
-// [1. 초기화]
+/* ==========================================================================
+   [Module 2] 초기화 (Initialization)
+   - 윈도우 로드 시 실행되는 초기 설정 및 이벤트 리스너 등록
+   ========================================================================== */
 window.onload = async () => {
-  // 로컬 스토리지에서 관리자 활성화 여부 확인
-  const savedAdminStatus = localStorage.getItem('IS_ADMIN_ACTIVE');
-  isAdmin = (savedAdminStatus === 'true');
+    // 1. 관리자 상태 복구
+    const savedAdminStatus = localStorage.getItem('IS_ADMIN_ACTIVE');
+    isAdmin = (savedAdminStatus === 'true');
+    updateAdminUI();
 
-  updateAdminUI(); 
+    // 2. GAS URL 확인 및 초기 데이터 로드
+    const url = localStorage.getItem('GAS_URL');
+    if (!url) {
+        showPage('settings');
+    } else {
+        await refreshSchema();
+        await initQuickMap();
+    }
 
-  const url = localStorage.getItem('GAS_URL');
-  if (!url) {
-    showPage('settings'); 
-  } else {
-    // 초기 로딩: 스키마(헤더)와 학생 목록을 가져옴
-    await refreshSchema();
-    await initQuickMap();
-  }
-
-  initFocusGuard();
-  updateFocusUI();
-  focusNfc();
-  setInterval(focusNfc, 2000);
+    // 3. 포커스 가드 실행 (NFC 입력 유지)
+    initFocusGuard();
+    updateFocusUI();
+    focusNfc();
+    setInterval(focusNfc, 2000);
 };
 
-// [2. 데이터 로드]
-async function initQuickMap() {
-  const res = await callApi({ action: 'getQuickMap' }, false);
-  if (res && res.success) {
-    quickMap = res.data;
-    console.log("학생 데이터 동기화 완료");
-    
-    // 현재 활성화된 페이지가 조회/포인트 페이지라면 목록 리렌더링
-    const activePage = document.querySelector('.page.active');
-    if (activePage && (activePage.id === 'page-search' || activePage.id === 'page-point')) {
-        const pageType = activePage.id.replace('page-','');
-        const input = document.getElementById(PAGE_CONFIG[pageType]?.inputId);
-        if (input && input.value) findStudent(pageType);
-    }
-  }
-}
-
-// [3. API 통신 공통 함수]
+/* ==========================================================================
+   [Module 3] API 통신 및 데이터 코어
+   - GAS 서버와의 통신, 데이터 캐싱 및 조회 유틸리티
+   ========================================================================== */
+// 공통 API 호출 함수
 async function callApi(data, showLoader = true) {
-  const url = localStorage.getItem('GAS_URL');
-  const loader = document.getElementById('loader');
-  
-  if(!url && data.action !== 'getSchema') { showPage('settings'); return null; }
-  
-  if (showLoader) {
-    isApiLoading = true;
-    if (loader) loader.style.display = 'flex';
-  }
-  
-  try {
-    const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
-    const json = await res.json();
-    return json;
-  } catch (e) { 
-    console.error("API Error:", e);
-    return { success: false, message: "연결 오류가 발생했습니다." }; 
-  } finally { 
+    const url = localStorage.getItem('GAS_URL');
+    const loader = document.getElementById('loader');
+
+    if (!url && data.action !== 'getSchema') { showPage('settings'); return null; }
+
     if (showLoader) {
-      isApiLoading = false; 
-      if (loader) loader.style.display = 'none'; 
-      updateFocusUI(); 
-      focusNfc(); 
+        isApiLoading = true;
+        if (loader) loader.style.display = 'flex';
     }
-  }
+
+    try {
+        const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+        return await res.json();
+    } catch (e) {
+        console.error("API Error:", e);
+        return { success: false, message: "연결 오류가 발생했습니다." };
+    } finally {
+        if (showLoader) {
+            isApiLoading = false;
+            if (loader) loader.style.display = 'none';
+            updateFocusUI();
+            focusNfc();
+        }
+    }
 }
 
-// [4. 데이터 조회 로직]
-function fetchData(query = '') {
-  const q = query.toLowerCase();
-  return Object.entries(quickMap)
-    .filter(([id, s]) => s.name.toLowerCase().includes(q) || id.includes(q))
-    .map(([id, s]) => ({ 
-        ID: id, 
-        이름: s.name, 
-        마지막출석: s.lastDate, 
-        포인트: s.point || 0,
-        상태: s.status,
-        전화번호: s.phone,
-        생년월일: s.birth
-    }));
-}
-
-async function findStudent(pageType) {
-  const config = PAGE_CONFIG[pageType];
-  const query = document.getElementById(config.inputId).value.trim();
-  const data = fetchData(query);
-  renderResults(data, pageType);
-}
-
-function findByNfc(id, pageType) {
-  const data = fetchData(''); 
-  const found = data.filter(s => String(s.ID) === String(id));
-  if (found.length > 0) renderResults(found, pageType);
-  else alert(`명단에 등록되지 않은 카드입니다.`);
-}
-
-// [5. 출석 체크 로직]
-async function doCheckin() {
-  const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
-  const id = input.value.trim();
-  if(!id) return;
-  input.value = ""; 
-
-  const student = quickMap[id]; 
-  const today = new Date().toLocaleDateString('sv-SE');
-  
-  if (student && student.lastDate === today) {
-    renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
-    return;
-  }
-
-  if (student) {
-    // 낙관적 UI 적용
-    renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
-    student.lastDate = today;
-    student.point = (Number(student.point) || 0) + 10;
-
-    callApi({ action: 'checkin', id: id }, false).then(res => {
-      if (!res || !res.success) {
-        renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
-      }
-    });
-  } else {
-    const res = await callApi({ action: 'checkin', id: id }, true);
+// 전체 학생 데이터 가져오기 (캐싱)
+async function initQuickMap() {
+    const res = await callApi({ action: 'getQuickMap' }, false);
     if (res && res.success) {
-      renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
-      await initQuickMap(); 
-    } else {
-      renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
+        quickMap = res.data;
+        console.log("학생 데이터 동기화 완료");
+
+        // 현재 보고 있는 페이지가 검색/포인트라면 결과 갱신
+        const activePage = document.querySelector('.page.active');
+        if (activePage && (activePage.id === 'page-search' || activePage.id === 'page-point')) {
+            const pageType = activePage.id.replace('page-', '');
+            const input = document.getElementById(PAGE_CONFIG[pageType]?.inputId);
+            if (input && input.value) findStudent(pageType);
+        }
     }
-  }
 }
 
-// 버튼 클릭 시 수동 출석
+// 로컬 데이터 검색 필터링
+function fetchData(query = '') {
+    const q = query.toLowerCase();
+    return Object.entries(quickMap)
+        .filter(([id, s]) => s.name.toLowerCase().includes(q) || id.includes(q))
+        .map(([id, s]) => ({
+            ID: id,
+            이름: s.name,
+            마지막출석: s.lastDate,
+            포인트: s.point || 0,
+            상태: s.status,
+            전화번호: s.phone,
+            생년월일: s.birth,
+            수업스케줄: s.schedule || ""
+        }));
+}
+
+// 검색창 입력 핸들러
+async function findStudent(pageType) {
+    const config = PAGE_CONFIG[pageType];
+    const query = document.getElementById(config.inputId).value.trim();
+    const data = fetchData(query);
+    renderResults(data, pageType);
+}
+
+// NFC 태그로 학생 찾기
+function findByNfc(id, pageType) {
+    const data = fetchData('');
+    const found = data.filter(s => String(s.ID) === String(id));
+    if (found.length > 0) renderResults(found, pageType);
+    else alert(`명단에 등록되지 않은 카드입니다.`);
+}
+
+/* ==========================================================================
+   [Module 4] 주요 기능: 출석 체크 (Check-in)
+   - 출석 처리, 중복 방지, 수동 출석 로직
+   ========================================================================== */
+async function doCheckin() {
+    const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
+    const id = input.value.trim();
+    if (!id) return;
+    input.value = "";
+
+    const student = quickMap[id];
+    const today = new Date().toLocaleDateString('sv-SE');
+
+    // 1. 이미 출석한 경우
+    if (student && student.lastDate === today) {
+        renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
+        return;
+    }
+
+    // 2. 정상 출석 (기존 학생)
+    if (student) {
+        renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)"); // 낙관적 업데이트
+        student.lastDate = today;
+        student.point = (Number(student.point) || 0) + 10;
+
+        callApi({ action: 'checkin', id: id }, false).then(res => {
+            if (!res || !res.success) {
+                renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
+            }
+        });
+    } 
+    // 3. 신규 카드 (미등록) -> 서버 확인
+    else {
+        const res = await callApi({ action: 'checkin', id: id }, true);
+        if (res && res.success) {
+            renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
+            await initQuickMap();
+        } else {
+            renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
+        }
+    }
+}
+
+// 수동 출석 버튼 핸들러
 async function doManualCheckin(id) {
     const student = quickMap[id];
-    if(!student) return;
-    
+    if (!student) return;
+
     const today = new Date().toLocaleDateString('sv-SE');
     if (student.lastDate === today) {
         alert("이미 오늘 출석했습니다.");
         return;
     }
-    
+
     renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
     student.lastDate = today;
     student.point = (Number(student.point) || 0) + 10;
-    
+
     await callApi({ action: 'checkin', id: id }, false);
     initQuickMap();
 }
 
-// [6. 포인트 관리]
-async function updatePt(id, amt, event) {
-  const amount = Number(amt);
-  const btn = event ? event.target : null;
-  
-  if (btn) {
-    btn.disabled = true;
-    btn.innerText = "⏳";
-  }
+// [유틸] 오늘 요일의 수업 시간 추출
+function getTodayClassTime(scheduleStr) {
+    if (!scheduleStr || scheduleStr.trim() === "") return "시간 미정";
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const today = days[new Date().getDay()];
+    const parts = scheduleStr.split(',').map(p => p.trim());
+    const match = parts.find(p => p.startsWith(today));
+    return match ? match.substring(1) : "수업없음";
+}
 
-  const res = await callApi({ action: 'updatePoint', id: id, amount: amount }, false);
-  
-  if (res && res.success) {
-    if(quickMap[id]) quickMap[id].point = res.newTotal;
-    if (btn) btn.innerText = "✅";
-    setTimeout(() => { if(btn) { btn.innerText = `+${amt}`; btn.disabled = false; } }, 1000);
-    findStudent('point'); 
-  }
+/* ==========================================================================
+   [Module 5] 주요 기능: 스케쥴 대시보드 (Schedule Dashboard)
+   - 당일 수업 대상자 분류 및 현황판 업데이트
+   ========================================================================== */
+function updateScheduleDashboard() {
+    const today = new Date().toLocaleDateString('sv-SE');
+    const grouped = {};
+    const summary = { total: 0, present: 0, absent: 0 };
+
+    Object.values(quickMap).forEach(student => {
+        const classTime = getTodayClassTime(student.schedule);
+        if (classTime !== "수업없음") {
+            const isPresent = (student.lastDate === today);
+            
+            if (!grouped[classTime]) grouped[classTime] = [];
+            grouped[classTime].push({
+                name: student.name,
+                isPresent: isPresent,
+                phone: student.phone || ""
+            });
+
+            summary.total++;
+            isPresent ? summary.present++ : summary.absent++;
+        }
+    });
+
+    UI.renderScheduleBoard(grouped, summary);
+}
+
+/* ==========================================================================
+   [Module 6] 주요 기능: 포인트, 등록, 카드 관리, 기록
+   - 기타 부가 기능들 모음
+   ========================================================================== */
+// [포인트] 업데이트
+async function updatePt(id, amt, event) {
+    const amount = Number(amt);
+    const btn = event ? event.target : null;
+    if (btn) { btn.disabled = true; btn.innerText = "⏳"; }
+
+    const res = await callApi({ action: 'updatePoint', id: id, amount: amount }, false);
+
+    if (res && res.success) {
+        if (quickMap[id]) quickMap[id].point = res.newTotal;
+        if (btn) btn.innerText = "✅";
+        setTimeout(() => { if (btn) { btn.innerText = `+${amt}`; btn.disabled = false; } }, 1000);
+        findStudent('point');
+    }
 }
 
 function updatePtManual(id, event) {
-  const input = document.getElementById(`pt-inp-${id}`);
-  if (!input || !input.value) return alert("포인트를 입력하세요");
-  updatePt(id, input.value, event);
-  input.value = "";
+    const input = document.getElementById(`pt-inp-${id}`);
+    if (!input || !input.value) return alert("포인트를 입력하세요");
+    updatePt(id, input.value, event);
+    input.value = "";
 }
 
-// [7. 학생 등록]
+// [신규 등록]
 async function registerStudent() {
     const fields = {};
     const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
@@ -212,51 +271,50 @@ async function registerStudent() {
     if (!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
 
     const res = await callApi({ action: 'add', fields: fields }, true);
-    
     if (res && res.success) {
         currentHeaders.forEach(h => {
             if (!skipHeaders.includes(h)) {
                 const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-                if (el) el.value = ""; 
+                if (el) el.value = "";
             }
         });
         alert("등록 완료!");
-        await initQuickMap(); 
+        await initQuickMap();
         document.getElementById(PAGE_CONFIG.register.inputId).focus();
     }
 }
 
-// [8. 카드 교체]
+// [카드 교체]
 async function execCardChange(oldId, name) {
-  const newIdInput = document.getElementById('new-card-input');
-  const newId = newIdInput ? newIdInput.value.trim() : "";
-  
-  if(!newId) return alert("새 카드를 태그하세요.");
-  if(confirm(`${name} 학생의 카드를 교체하시겠습니까?`)) {
-      const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId }, true);
-      if(res && res.success) { 
-          alert("교체 완료"); 
-          await initQuickMap(); 
-          showPage('checkin'); 
-      } else {
-          alert(res.message);
-      }
-  }
+    const newIdInput = document.getElementById('new-card-input');
+    const newId = newIdInput ? newIdInput.value.trim() : "";
+
+    if (!newId) return alert("새 카드를 태그하세요.");
+    if (confirm(`${name} 학생의 카드를 교체하시겠습니까?`)) {
+        const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId }, true);
+        if (res && res.success) {
+            alert("교체 완료");
+            await initQuickMap();
+            showPage('checkin');
+        } else {
+            alert(res.message);
+        }
+    }
 }
 
-// [9. 달력 그리기 로직]
+// [달력/기록] UI 초기화
 function initCalendarUI(id) {
     const now = new Date();
-    // 캐시 객체 초기화 시 데이터 저장소 추가
-    calCache[id] = { 
-        year: now.getFullYear(), 
+    calCache[id] = {
+        year: now.getFullYear(),
         month: now.getMonth(),
-        history: null,      // 서버에서 받은 날짜 배열 저장
-        historyYear: null   // 어떤 연도의 데이터인지 기록
+        history: null,
+        historyYear: null
     };
     drawGrid(id);
 }
 
+// [달력/기록] 그리드 그리기
 async function drawGrid(id) {
     const state = calCache[id];
     const grid = document.getElementById(`grid-${id}`);
@@ -264,25 +322,15 @@ async function drawGrid(id) {
     if (!grid || !label) return;
 
     label.innerText = `${state.year}년 ${state.month + 1}월`;
-    
-    // 1. 달력 영역에 로딩 메시지 표시 (기존 내용 지우고 로딩 띄움)
     grid.innerHTML = "<div style='grid-column: span 7; padding: 20px; color: var(--muted);'>데이터 불러오는 중...</div>";
 
-    // 2. 1년치 데이터 가져오기 (연도가 바뀔 때만 서버 호출)
     if (!state.history || state.historyYear !== state.year) {
-        const res = await callApi({ 
-            action: 'getHistory', 
-            id: id, 
-            year: state.year 
-        }, false); // 전체 화면 로더 대신 부분 로딩 사용
-        
+        const res = await callApi({ action: 'getHistory', id: id, year: state.year }, false);
         state.history = (res && res.success) ? res.history : [];
         state.historyYear = state.year;
     }
 
-    // 3. 로딩 메시지 제거 후 실제 그리드 그리기
     grid.innerHTML = "";
-    
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     days.forEach(d => {
         const dDiv = document.createElement('div');
@@ -296,9 +344,7 @@ async function drawGrid(id) {
     const lastDate = new Date(state.year, state.month + 1, 0).getDate();
     const todayStr = new Date().toLocaleDateString('sv-SE');
 
-    for (let i = 0; i < firstDay; i++) {
-        grid.appendChild(document.createElement('div'));
-    }
+    for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
 
     for (let d = 1; d <= lastDate; d++) {
         const dDiv = document.createElement('div');
@@ -316,178 +362,199 @@ function changeMonthUI(id, delta) {
     state.month += delta;
     if (state.month > 11) { state.month = 0; state.year++; }
     if (state.month < 0) { state.month = 11; state.year--; }
-    
-    // drawGrid 내부에서 연도가 같으면 캐시를 사용하므로 
-    // 서버 호출 없이 즉시 화면이 갱신됩니다.
     drawGrid(id);
 }
 
-// [10. UI 브릿지 함수 (ui.js와 연결)]
-function renderResults(data, type) {
-  UI.renderResults(data, type);
-}
+/* ==========================================================================
+   [Module 7] UI 브릿지 및 페이지 네비게이션
+   - ui.js와의 연결, 페이지 전환 로직
+   ========================================================================== */
+function renderResults(data, type) { UI.renderResults(data, type); }
+function renderCheckinUI(name, msg, color) { UI.renderCheckinUI(name, msg, color); }
 
-function renderCheckinUI(name, msg, color) {
-  UI.renderCheckinUI(name, msg, color);
-}
-
-// [11. 페이지 관리]
+// 페이지 전환 로직
 function showPage(p) {
-  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-  const targetPage = document.getElementById('page-' + p);
-  if (targetPage) targetPage.classList.add('active');
-
-  document.querySelectorAll('.nav button').forEach(btn => {
-    btn.classList.toggle('active', btn.id === 'nav-' + p);
-  });
-
-  document.querySelectorAll('input').forEach(input => {
-    if (!['nfc-bridge', 'cfg-url'].includes(input.id) && input.type !== 'button') {
-      input.value = ""; 
+    // 1. 모든 페이지 숨김
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    
+    // 2. 타겟 페이지 활성화
+    const targetPage = document.getElementById('page-' + p);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        targetPage.style.display = 'block'; // display 속성도 확실하게 제어
     }
-  });
+    document.querySelectorAll('.page:not(#page-' + p + ')').forEach(el => el.style.display = 'none');
 
-  const resultContainers = ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'];
-  resultContainers.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ""; });
+    // 3. 네비게이션 버튼 활성화
+    document.querySelectorAll('.nav button').forEach(btn => {
+        btn.classList.toggle('active', btn.id === 'nav-' + p);
+    });
 
-  if (p === 'settings') {
-    document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
-  }
-  if (p === 'add') refreshSchema(false);
+    // 4. 입력창 초기화
+    document.querySelectorAll('input').forEach(input => {
+        if (!['nfc-bridge', 'cfg-url'].includes(input.id) && input.type !== 'button') {
+            input.value = "";
+        }
+    });
 
-  isUserTyping = false;
-  updateFocusUI();
-  setTimeout(focusNfc, 300);
+    // 5. 결과 영역 초기화
+    ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = "";
+    });
+
+    // 6. 페이지별 특수 로직 실행
+    if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
+    if (p === 'add') refreshSchema(false);
+    if (p === 'schedule') updateScheduleDashboard(); // 스케쥴 페이지 진입 시 데이터 갱신
+
+    // 7. 포커스 관리
+    isUserTyping = false;
+    updateFocusUI();
+    
+    // 해당 페이지의 전용 입력창이 있으면 포커스
+    if (PAGE_CONFIG[p] && PAGE_CONFIG[p].inputId) {
+        const inputEl = document.getElementById(PAGE_CONFIG[p].inputId);
+        if(inputEl) setTimeout(() => inputEl.focus(), 100);
+    } else {
+        setTimeout(focusNfc, 300);
+    }
 }
 
-// [12. 관리자 모드]
+// 관리자 모드 토글
 function toggleAdmin() {
-  if (!isAdmin) {
-    isAdmin = true;
-    localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
-    alert("관리자 모드 활성화");
-  } else {
-    if (confirm("관리자 모드를 종료하시겠습니까?")) {
-      isAdmin = false;
-      localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
-      showPage('checkin');
+    if (!isAdmin) {
+        isAdmin = true;
+        localStorage.setItem('IS_ADMIN_ACTIVE', 'true');
+        alert("관리자 모드 활성화");
+    } else {
+        if (confirm("관리자 모드를 종료하시겠습니까?")) {
+            isAdmin = false;
+            localStorage.setItem('IS_ADMIN_ACTIVE', 'false');
+            showPage('checkin');
+        }
     }
-  }
-  updateAdminUI();
+    updateAdminUI();
 }
 
 function updateAdminUI() {
-  document.querySelectorAll('.admin-only-btn').forEach(el => {
-    el.style.display = isAdmin ? 'inline-block' : 'none';
-  });
-  const status = document.getElementById('mode-status');
-  if (status) {
-    status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
-    status.className = isAdmin ? "admin-active" : "";
-  }
-  const lockBtn = document.querySelector('.admin-lock-btn');
-  if (lockBtn) lockBtn.innerText = isAdmin ? "🔓" : "🔒";
+    document.querySelectorAll('.admin-only-btn').forEach(el => {
+        el.style.display = isAdmin ? 'inline-block' : 'none';
+    });
+    const status = document.getElementById('mode-status');
+    if (status) {
+        status.innerText = isAdmin ? "● 관리자 모드" : "● 학생 모드";
+        status.className = isAdmin ? "admin-active" : "";
+    }
+    const lockBtn = document.querySelector('.admin-lock-btn');
+    if (lockBtn) lockBtn.innerText = isAdmin ? "🔓" : "🔒";
 }
 
-// [13. 설정 및 스키마]
+// 설정 및 스키마 관리
 async function saveSettings() {
-  const url = document.getElementById('cfg-url').value.trim();
-  localStorage.setItem('GAS_URL', url);
-  const res = await callApi({ action: 'getSchema' }, true);
-  if(res && res.headers) { 
-      alert("연결 성공!"); 
-      currentHeaders = res.headers;
-      await initQuickMap(); 
-      showPage('checkin'); 
-  } else {
-      alert("URL을 확인해주세요.");
-  }
+    const url = document.getElementById('cfg-url').value.trim();
+    localStorage.setItem('GAS_URL', url);
+    const res = await callApi({ action: 'getSchema' }, true);
+    if (res && res.headers) {
+        alert("연결 성공!");
+        currentHeaders = res.headers;
+        await initQuickMap();
+        showPage('checkin');
+    } else {
+        alert("URL을 확인해주세요.");
+    }
 }
 
 async function refreshSchema(force = false) {
-  // 이미 헤더가 있고 강제 새로고침이 아니라면 서버 요청 없이 즉시 렌더링
-  if (!force && currentHeaders && currentHeaders.length > 0) {
-    renderAddFields();
-    return;
-  }
-
-  // 헤더가 없거나 force(새로고침)인 경우에만 서버 호출
-  const res = await callApi({ action: 'getSchema' });
-  if (res && res.headers) {
-    currentHeaders = res.headers;
-    renderAddFields();
-  }
+    if (!force && currentHeaders && currentHeaders.length > 0) {
+        renderAddFields();
+        return;
+    }
+    const res = await callApi({ action: 'getSchema' });
+    if (res && res.headers) {
+        currentHeaders = res.headers;
+        renderAddFields();
+    }
 }
 
 function renderAddFields() {
-  const container = document.getElementById('dynamic-add-fields');
-  if (!container) return;
-  container.innerHTML = "";
-  const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
+    const container = document.getElementById('dynamic-add-fields');
+    if (!container) return;
+    container.innerHTML = "";
+    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
 
-  currentHeaders.forEach(header => {
-    if (skipHeaders.includes(header)) return;
-    const label = document.createElement('label');
-    label.innerText = header;
-    label.className = "field-label";
-    container.appendChild(label);
+    currentHeaders.forEach(header => {
+        if (skipHeaders.includes(header)) return;
+        const label = document.createElement('label');
+        label.innerText = header;
+        label.className = "field-label";
+        container.appendChild(label);
 
-    const input = document.createElement('input');
-    if (header === 'ID') { 
-      input.id = PAGE_CONFIG.register.inputId; 
-      input.readOnly = true; 
-      input.placeholder = "카드를 태그하세요"; 
-    } else { 
-      input.id = `field-${header}`; 
-      input.placeholder = `${header} 입력`;
-    }
-    container.appendChild(input);
-  });
+        const input = document.createElement('input');
+        if (header === 'ID') {
+            input.id = PAGE_CONFIG.register.inputId;
+            input.readOnly = true;
+            input.placeholder = "카드를 태그하세요";
+        } else {
+            input.id = `field-${header}`;
+            input.placeholder = (header === '수업스케줄') ? "예: 월7:10, 수7:10" : `${header} 입력`;
+        }
+        container.appendChild(input);
+    });
 }
 
-// [14. 포커스 및 NFC 리스너]
+/* ==========================================================================
+   [Module 8] 하드웨어 인터페이스 (NFC & Focus)
+   - NFC 리더기 입력 감지 및 포커스 제어
+   ========================================================================== */
 function updateFocusUI() {
-  const indicator = document.getElementById('focus-indicator');
-  if (indicator) indicator.innerText = isUserTyping ? "⌨️ 입력 중" : "📡 리더기 대기";
+    const indicator = document.getElementById('focus-indicator');
+    if (indicator) indicator.innerText = isUserTyping ? "⌨️ 입력 중" : "📡 리더기 대기";
 }
 
 function focusNfc() {
-  if (isUserTyping || isApiLoading) return;
-  if (document.activeElement.tagName !== 'INPUT') nfcBridge.focus({ preventScroll: true });
+    if (isUserTyping || isApiLoading) return;
+    if (document.activeElement.tagName !== 'INPUT') nfcBridge.focus({ preventScroll: true });
 }
 
 function initFocusGuard() {
-  document.querySelectorAll('input').forEach(el => {
-    if (el.id === 'nfc-bridge') return;
-    el.addEventListener('focus', () => { isUserTyping = true; updateFocusUI(); });
-    el.addEventListener('blur', () => { setTimeout(() => { isUserTyping = false; updateFocusUI(); focusNfc(); }, 500); });
-  });
+    document.querySelectorAll('input').forEach(el => {
+        if (el.id === 'nfc-bridge') return;
+        el.addEventListener('focus', () => { isUserTyping = true; updateFocusUI(); });
+        el.addEventListener('blur', () => { setTimeout(() => { isUserTyping = false; updateFocusUI(); focusNfc(); }, 500); });
+    });
 }
 
 nfcBridge.addEventListener('keydown', (e) => {
-  if(e.key === 'Enter') {
-    const val = nfcBridge.value.trim();
-    if(val) processNfc(val);
-    nfcBridge.value = "";
-  }
+    if (e.key === 'Enter') {
+        const val = nfcBridge.value.trim();
+        if (val) processNfc(val);
+        nfcBridge.value = "";
+    }
 });
 
 function processNfc(val) {
-  const activePage = document.querySelector('.page.active');
-  if (!activePage) return;
-  const pageType = activePage.id.replace('page-', '');
-  
-  if (pageType === 'add') {
-    const idInp = document.getElementById(PAGE_CONFIG.register.inputId);
-    if (idInp) idInp.value = val;
-  } else if (pageType === 'checkin') {
-    document.getElementById(PAGE_CONFIG.checkin.inputId).value = val;
-    doCheckin();
-  } else if (pageType === 'card' && document.getElementById('new-card-input')) {
-    document.getElementById('new-card-input').value = val;
-  } else if (PAGE_CONFIG[pageType]) {
-    findByNfc(val, pageType);
-  }
+    const activePage = document.querySelector('.page.active');
+    if (!activePage) return;
+    const pageType = activePage.id.replace('page-', '');
+
+    if (pageType === 'add') {
+        const idInp = document.getElementById(PAGE_CONFIG.register.inputId);
+        if (idInp) idInp.value = val;
+    } else if (pageType === 'checkin') {
+        document.getElementById(PAGE_CONFIG.checkin.inputId).value = val;
+        doCheckin();
+    } else if (pageType === 'card' && document.getElementById('new-card-input')) {
+        document.getElementById('new-card-input').value = val;
+    } else if (PAGE_CONFIG[pageType]) {
+        findByNfc(val, pageType);
+    }
 }
 
-document.body.onclick = (e) => { if(e.target.tagName !== 'INPUT') { isUserTyping = false; updateFocusUI(); focusNfc(); } };
+document.body.onclick = (e) => {
+    if (e.target.tagName !== 'INPUT') {
+        isUserTyping = false;
+        updateFocusUI();
+        focusNfc();
+    }
+};

@@ -21,6 +21,7 @@
   <div class="nav">
     <button onclick="showPage('checkin')" id="nav-checkin" class="active">출석</button>
     <button onclick="showPage('search')" id="nav-search" class="admin-only-btn">조회</button>
+    <button onclick="showPage('schedule')" id="nav-schedule" class="admin-only-btn">스케쥴</button>
     <button onclick="showPage('point')" id="nav-point" class="admin-only-btn">포인트</button>
     <button onclick="showPage('card')" id="nav-card" class="admin-only-btn">카드교체</button>
     <button onclick="showPage('add')" id="nav-add" class="admin-only-btn">등록</button>
@@ -41,6 +42,16 @@
     <input type="text" id="Search" placeholder="이름 검색..." autocomplete="off">
     <button class="btn btn-primary" onclick="findStudent('search')">검색</button>
     <div id="search-results"></div>
+  </div>
+
+  <div id="page-schedule" class="page">
+    <div class="page-header">
+        <h2>📅 오늘의 수업 현황</h2>
+        <div id="schedule-summary" class="status-summary"></div>
+    </div>
+    <div id="schedule-board" class="status-board"></div>
+    
+    <input type="hidden" id="page-schedule-status">
   </div>
 
   <div id="page-point" class="page">

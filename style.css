@@ -82,3 +82,18 @@ input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px
   .dash-info { border-right: none; border-bottom: 1px solid #334155; }
   .nav button { width: auto; padding: 12px 15px; }
 }
+
+/* 출석 완료 (초록색) */
+.student-card.present {
+    border-left: 5px solid #28a745;
+    background-color: #e8f5e9;
+    color: #1b5e20;
+}
+
+/* 미출석 (빨간색) */
+.student-card.absent {
+    border-left: 5px solid #dc3545;
+    background-color: #ffebee;
+    color: #b71c1c;
+    opacity: 0.8; /* 아직 안 온 느낌 */
+}

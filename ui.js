@@ -12,61 +12,58 @@ const UI = {
         }
     },
 
-    // 2. 검색/조회 결과 대시보드 (정보 + 달력 레이아웃)
+    // 2. 검색/조회 결과 대시보드 (기존 로직 유지)
     renderResults(data, type) {
-    const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
-    if (!data || data.length === 0) { 
-        container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
-        return; 
-    }
-
-    container.innerHTML = data.map(s => {
-        const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
+        const containerId = type === 'search' ? 'search-results' : (type === 'point' ? 'point-target-area' : 'card-target-area');
+        const container = document.getElementById(containerId);
+        if (!container) return;
         
-        if (type === 'search') {
-            return `
-            <div class="student-dashboard-card">
-                <div class="dash-info">
-                    <div class="info-header">
-                        <span class="student-name">${s.이름}</span>
-                        <span class="status-badge" style="background:${statusColor}">${s.상태 || '재원'}</span>
-                    </div>
-                    <div class="info-body">
-                        <div class="info-item">🎂 ${s.생년월일 || '-'}</div>
-                        <div class="info-item">📱 ${s.전화번호 || '-'}</div>
-                        <div class="info-item">💰 <span class="point-val">${s.포인트} pt</span></div>
-                    </div>
-                    <button class="btn-manual-checkin" onclick="doManualCheckin('${s.ID}')">이 학생 출석하기</button>
-                </div>
-                <div class="dash-calendar">
-                    <div class="cal-nav">
-                        <button class="cal-btn" onclick="changeMonthUI('${s.ID}', -1)">◀</button>
-                        <span class="cal-label" id="cal-label-${s.ID}">0000년 00월</span>
-                        <button class="cal-btn" onclick="changeMonthUI('${s.ID}', 1)">▶</button>
-                    </div>
-                    <div class="cal-grid" id="grid-${s.ID}">
-                        <div style="grid-column: span 7; padding: 20px; color: var(--muted); font-size: 0.8rem;">데이터 로딩 중...</div>
-                    </div>
-                </div>
-            </div> `;
+        if (!data || data.length === 0) { 
+            container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
+            return; 
         }
 
-        return this.renderSimpleCard(s, type, statusColor);
-    }).join('');
+        container.innerHTML = data.map(s => {
+            const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
+            
+            if (type === 'search') {
+                return `
+                <div class="student-dashboard-card">
+                    <div class="dash-info">
+                        <div class="info-header">
+                            <span class="student-name">${s.이름}</span>
+                            <span class="status-badge" style="background:${statusColor}">${s.상태 || '재원'}</span>
+                        </div>
+                        <div class="info-body">
+                            <div class="info-item">🎂 ${s.생년월일 || '-'}</div>
+                            <div class="info-item">📱 ${s.전화번호 || '-'}</div>
+                            <div class="info-item">💰 <span class="point-val">${s.포인트} pt</span></div>
+                        </div>
+                        <button class="btn-manual-checkin" onclick="doManualCheckin('${s.ID}')">이 학생 출석하기</button>
+                    </div>
+                    <div class="dash-calendar">
+                        <div class="cal-nav">
+                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', -1)">◀</button>
+                            <span class="cal-label" id="cal-label-${s.ID}">0000년 00월</span>
+                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', 1)">▶</button>
+                        </div>
+                        <div class="cal-grid" id="grid-${s.ID}">
+                            <div style="grid-column: span 7; padding: 20px; color: var(--muted); font-size: 0.8rem;">데이터 로딩 중...</div>
+                        </div>
+                    </div>
+                </div> `;
+            }
+            return this.renderSimpleCard(s, type, statusColor);
+        }).join('');
 
-    if (type === 'search') {
-        // 검색 결과가 여러 명일 경우를 대비해 순차적으로 초기화
-        data.forEach(s => {
-            // DOM이 완전히 그려진 후 실행되도록 setTimeout 사용
-            setTimeout(() => initCalendarUI(s.ID), 10);
-        });
-    }
-},
+        if (type === 'search') {
+            data.forEach(s => {
+                setTimeout(() => initCalendarUI(s.ID), 10);
+            });
+        }
+    },
 
-    // 포인트/카드 교체용 심플 카드
+    // 3. 포인트/카드 교체용 심플 카드 (기존 로직 유지)
     renderSimpleCard(s, type, statusColor) {
         return `
         <div class="student-info-card">
@@ -85,6 +82,55 @@ const UI = {
             ${type === 'point' ? this.renderPointActions(s.ID) : ''}
             ${type === 'card' ? this.renderCardActions(s.ID, s.이름) : ''}
         </div>`;
+    },
+
+    // --- [새로 추가된 현황판 렌더링 로직] ---
+    
+    // 4. 출석 현황판 렌더링
+    renderStatusBoard(groupedData, summary) {
+        const board = document.getElementById('status-board');
+        const summaryDiv = document.getElementById('status-summary');
+        if (!board || !summaryDiv) return;
+
+        // 상단 요약 바 렌더링
+        summaryDiv.innerHTML = `
+            <div class="summary-item total">대상: <strong>${summary.total}</strong></div>
+            <div class="summary-item present">출석: <strong>${summary.present}</strong></div>
+            <div class="summary-item absent">미출석: <strong>${summary.absent}</strong></div>
+        `;
+
+        board.innerHTML = "";
+        const sortedTimes = Object.keys(groupedData).sort();
+
+        if (sortedTimes.length === 0) {
+            board.innerHTML = "<div class='empty-msg' style='text-align:center; padding:50px; color:var(--muted);'>오늘 예정된 수업이 없습니다.</div>";
+            return;
+        }
+
+        sortedTimes.forEach(time => {
+            const section = document.createElement('div');
+            section.className = 'time-section';
+            
+            const students = groupedData[time];
+            section.innerHTML = `
+                <div class="time-title" style="font-weight:bold; margin: 20px 0 10px 0; font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px;">
+                    ${time} 수업
+                </div>
+                <div class="status-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:10px;">
+                    ${students.map(s => `
+                        <div class="status-card ${s.isPresent ? 'is-present' : 'is-absent'}" 
+                             style="padding:15px 10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #dee2e6; 
+                                    background-color: ${s.isPresent ? '#ebfbee' : '#fff5f5'}; 
+                                    border-color: ${s.isPresent ? '#b2f2bb' : '#ffc9c9'}; 
+                                    color: ${s.isPresent ? '#2b8a3e' : '#c92a2a'};">
+                            <div style="margin-bottom:5px;">${s.name}</div>
+                            <div style="font-size:1.2rem;">${s.isPresent ? '✅' : '❌'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            board.appendChild(section);
+        });
     },
 
     renderPointActions(id) {
