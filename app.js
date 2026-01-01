@@ -281,7 +281,13 @@ async function execCardChange(oldId, name) {
    ========================================================================== */
 function initCalendarUI(id) {
     const now = new Date();
-    calCache[id] = { year: now.getFullYear(), month: now.getMonth(), history: null, historyYear: null };
+    // 해당 학생의 달력 상태 초기화
+    calCache[id] = { 
+        year: now.getFullYear(), 
+        month: now.getMonth(), 
+        history: null, 
+        historyYear: null 
+    };
     drawGrid(id);
 }
 
@@ -292,36 +298,67 @@ async function drawGrid(id) {
     if (!grid || !label) return;
 
     label.innerText = `${state.year}년 ${state.month + 1}월`;
+
+    // 1. 서버 데이터 로딩 및 형식 통일 (YYYY-MM-DD)
     if (!state.history || state.historyYear !== state.year) {
         const res = await callApi({ action: 'getHistory', id: id, year: state.year }, false);
-        state.history = (res && res.success) ? res.history : [];
+        if (res && res.success && Array.isArray(res.history)) {
+            // 서버에서 어떤 형식이 오든 '2026-01-02' 형태로 변환하여 저장
+            state.history = res.history.map(dateStr => {
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('sv-SE');
+            });
+        } else {
+            state.history = [];
+        }
         state.historyYear = state.year;
     }
 
+    // 2. 캘린더 헤더(요일) 생성
     grid.innerHTML = "";
     ['일', '월', '화', '수', '목', '금', '토'].forEach(d => {
-        const dDiv = document.createElement('div'); dDiv.className = 'day-header'; dDiv.innerText = d; grid.appendChild(dDiv);
+        const dDiv = document.createElement('div'); 
+        dDiv.className = 'day-header'; 
+        dDiv.innerText = d; 
+        grid.appendChild(dDiv);
     });
 
+    // 3. 매칭을 위한 준비
     const attendanceSet = new Set(state.history);
     const firstDay = new Date(state.year, state.month, 1).getDay();
     const lastDate = new Date(state.year, state.month + 1, 0).getDate();
     const todayStr = new Date().toLocaleDateString('sv-SE');
 
+    // 4. 달력 칸 생성
+    // 시작 요일 앞 공백
     for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+
+    // 날짜 숫자 생성
     for (let d = 1; d <= lastDate; d++) {
         const dDiv = document.createElement('div');
         dDiv.className = 'day-num';
         dDiv.innerText = d;
+
+        // 비교용 YYYY-MM-DD 문자열 생성 (예: 2026-01-02)
         const fullDate = `${state.year}-${String(state.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+        // 오늘 날짜 표시
         if (fullDate === todayStr) dDiv.classList.add('is-today');
-        if (attendanceSet.has(fullDate)) dDiv.classList.add('is-present');
+
+        // 출석 기록이 있다면 클래스 추가
+        if (attendanceSet.has(fullDate)) {
+            dDiv.classList.add('is-present');
+            // 확인용 콘솔 로그 (잘 나오면 나중에 지우셔도 됩니다)
+            console.log(`[매칭성공] ${id} 학생 : ${fullDate}`);
+        }
+
         grid.appendChild(dDiv);
     }
 }
 
 function changeMonthUI(id, delta) {
     const state = calCache[id];
+    if(!state) return;
     state.month += delta;
     if (state.month > 11) { state.month = 0; state.year++; }
     else if (state.month < 0) { state.month = 11; state.year--; }
