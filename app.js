@@ -1,6 +1,5 @@
 /* ==========================================================================
    [Module 1] 설정 및 전역 상태 관리
-   - 페이지 설정, 관리자 여부, 캐시 데이터 등 전역 변수 정의
    ========================================================================== */
 const PAGE_CONFIG = {
     checkin:  { inputId: 'CheckIn' },
@@ -16,13 +15,12 @@ let isAdmin = false;
 let isUserTyping = false;
 let isApiLoading = false;
 let currentHeaders = [];
-let quickMap = {};       // 학생 전체 데이터 캐시
-const calCache = {};     // 달력 데이터 캐시
+let quickMap = {};     // 학생 전체 데이터 캐시 (row 정보 포함)
+const calCache = {};   // 달력 데이터 캐시
 const nfcBridge = document.getElementById('nfc-bridge');
 
 /* ==========================================================================
    [Module 2] 초기화 (Initialization)
-   - 윈도우 로드 시 실행되는 초기 설정 및 이벤트 리스너 등록
    ========================================================================== */
 window.onload = async () => {
     // 1. 관리자 상태 복구
@@ -48,7 +46,6 @@ window.onload = async () => {
 
 /* ==========================================================================
    [Module 3] API 통신 및 데이터 코어
-   - GAS 서버와의 통신, 데이터 캐싱 및 조회 유틸리티
    ========================================================================== */
 // 공통 API 호출 함수
 async function callApi(data, showLoader = true) {
@@ -78,14 +75,13 @@ async function callApi(data, showLoader = true) {
     }
 }
 
-// 전체 학생 데이터 가져오기 (캐싱)
+// 전체 학생 데이터 가져오기 (캐싱 - Row 정보 포함)
 async function initQuickMap() {
     const res = await callApi({ action: 'getQuickMap' }, false);
     if (res && res.success) {
         quickMap = res.data;
-        console.log("학생 데이터 동기화 완료");
+        console.log("학생 데이터 동기화 완료 (Optimized)");
 
-        // 현재 보고 있는 페이지가 검색/포인트라면 결과 갱신
         const activePage = document.querySelector('.page.active');
         if (activePage && (activePage.id === 'page-search' || activePage.id === 'page-point')) {
             const pageType = activePage.id.replace('page-', '');
@@ -108,7 +104,8 @@ function fetchData(query = '') {
             상태: s.status,
             전화번호: s.phone,
             생년월일: s.birth,
-            수업스케줄: s.schedule || ""
+            수업스케줄: s.schedule || "",
+            row: s.row // 서버 지시용 인덱스
         }));
 }
 
@@ -130,7 +127,6 @@ function findByNfc(id, pageType) {
 
 /* ==========================================================================
    [Module 4] 주요 기능: 출석 체크 (Check-in)
-   - 출석 처리, 중복 방지, 수동 출석 로직
    ========================================================================== */
 async function doCheckin() {
     const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
@@ -141,26 +137,25 @@ async function doCheckin() {
     const student = quickMap[id];
     const today = new Date().toLocaleDateString('sv-SE');
 
-    // 1. 이미 출석한 경우
     if (student && student.lastDate === today) {
         renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)");
         return;
     }
 
-    // 2. 정상 출석 (기존 학생)
     if (student) {
-        renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)"); // 낙관적 업데이트
+        // 낙관적 UI 업데이트
+        renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
         student.lastDate = today;
         student.point = (Number(student.point) || 0) + 10;
 
-        callApi({ action: 'checkin', id: id }, false).then(res => {
+        // Row 정보를 함께 보내 서버 루프 제거
+        callApi({ action: 'checkin', id: id, row: student.row }, false).then(res => {
             if (!res || !res.success) {
                 renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
             }
         });
-    } 
-    // 3. 신규 카드 (미등록) -> 서버 확인
-    else {
+    } else {
+        // 신규 카드의 경우만 서버에서 전체 검색
         const res = await callApi({ action: 'checkin', id: id }, true);
         if (res && res.success) {
             renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)");
@@ -171,7 +166,6 @@ async function doCheckin() {
     }
 }
 
-// 수동 출석 버튼 핸들러
 async function doManualCheckin(id) {
     const student = quickMap[id];
     if (!student) return;
@@ -186,11 +180,10 @@ async function doManualCheckin(id) {
     student.lastDate = today;
     student.point = (Number(student.point) || 0) + 10;
 
-    await callApi({ action: 'checkin', id: id }, false);
+    await callApi({ action: 'checkin', id: id, row: student.row }, false);
     initQuickMap();
 }
 
-// [유틸] 오늘 요일의 수업 시간 추출
 function getTodayClassTime(scheduleStr) {
     if (!scheduleStr || scheduleStr.trim() === "") return "시간 미정";
     const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -201,8 +194,7 @@ function getTodayClassTime(scheduleStr) {
 }
 
 /* ==========================================================================
-   [Module 5] 주요 기능: 스케쥴 대시보드 (Schedule Dashboard)
-   - 당일 수업 대상자 분류 및 현황판 업데이트
+   [Module 5] 주요 기능: 스케쥴 대시보드
    ========================================================================== */
 function updateScheduleDashboard() {
     const today = new Date().toLocaleDateString('sv-SE');
@@ -226,23 +218,26 @@ function updateScheduleDashboard() {
         }
     });
 
-    UI.renderScheduleBoard(grouped, summary);
+    if (window.UI && UI.renderScheduleBoard) {
+        UI.renderScheduleBoard(grouped, summary);
+    }
 }
 
 /* ==========================================================================
-   [Module 6] 주요 기능: 포인트, 등록, 카드 관리, 기록
-   - 기타 부가 기능들 모음
+   [Module 6] 주요 기능: 포인트, 등록, 카드 관리
    ========================================================================== */
-// [포인트] 업데이트
 async function updatePt(id, amt, event) {
+    const student = quickMap[id];
+    if (!student) return;
+    
     const amount = Number(amt);
     const btn = event ? event.target : null;
     if (btn) { btn.disabled = true; btn.innerText = "⏳"; }
 
-    const res = await callApi({ action: 'updatePoint', id: id, amount: amount }, false);
+    const res = await callApi({ action: 'updatePoint', id: id, row: student.row, amount: amount }, false);
 
     if (res && res.success) {
-        if (quickMap[id]) quickMap[id].point = res.newTotal;
+        student.point = res.newTotal;
         if (btn) btn.innerText = "✅";
         setTimeout(() => { if (btn) { btn.innerText = `+${amt}`; btn.disabled = false; } }, 1000);
         findStudent('point');
@@ -256,7 +251,6 @@ function updatePtManual(id, event) {
     input.value = "";
 }
 
-// [신규 등록]
 async function registerStudent() {
     const fields = {};
     const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
@@ -272,26 +266,20 @@ async function registerStudent() {
 
     const res = await callApi({ action: 'add', fields: fields }, true);
     if (res && res.success) {
-        currentHeaders.forEach(h => {
-            if (!skipHeaders.includes(h)) {
-                const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-                if (el) el.value = "";
-            }
-        });
         alert("등록 완료!");
-        await initQuickMap();
-        document.getElementById(PAGE_CONFIG.register.inputId).focus();
+        await initQuickMap(); // 새 row 정보 갱신
+        showPage('checkin');
     }
 }
 
-// [카드 교체]
 async function execCardChange(oldId, name) {
+    const student = quickMap[oldId];
     const newIdInput = document.getElementById('new-card-input');
     const newId = newIdInput ? newIdInput.value.trim() : "";
 
     if (!newId) return alert("새 카드를 태그하세요.");
     if (confirm(`${name} 학생의 카드를 교체하시겠습니까?`)) {
-        const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId }, true);
+        const res = await callApi({ action: 'updateId', oldId: oldId, newId: newId, row: student.row }, true);
         if (res && res.success) {
             alert("교체 완료");
             await initQuickMap();
@@ -302,7 +290,9 @@ async function execCardChange(oldId, name) {
     }
 }
 
-// [달력/기록] UI 초기화
+/* ==========================================================================
+   [Module 7] 달력/기록 (History)
+   ========================================================================== */
 function initCalendarUI(id) {
     const now = new Date();
     calCache[id] = {
@@ -314,7 +304,6 @@ function initCalendarUI(id) {
     drawGrid(id);
 }
 
-// [달력/기록] 그리드 그리기
 async function drawGrid(id) {
     const state = calCache[id];
     const grid = document.getElementById(`grid-${id}`);
@@ -366,53 +355,46 @@ function changeMonthUI(id, delta) {
 }
 
 /* ==========================================================================
-   [Module 7] UI 브릿지 및 페이지 네비게이션
-   - ui.js와의 연결, 페이지 전환 로직
+   [Module 8] UI 브릿지 및 페이지 네비게이션
    ========================================================================== */
-function renderResults(data, type) { UI.renderResults(data, type); }
-function renderCheckinUI(name, msg, color) { UI.renderCheckinUI(name, msg, color); }
+function renderResults(data, type) { if(window.UI) UI.renderResults(data, type); }
+function renderCheckinUI(name, msg, color) { if(window.UI) UI.renderCheckinUI(name, msg, color); }
 
-// 페이지 전환 로직
 function showPage(p) {
-    // 1. 모든 페이지 숨김
-    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+    });
     
-    // 2. 타겟 페이지 활성화
     const targetPage = document.getElementById('page-' + p);
     if (targetPage) {
         targetPage.classList.add('active');
-        targetPage.style.display = 'block'; // display 속성도 확실하게 제어
+        targetPage.style.display = 'block';
     }
-    document.querySelectorAll('.page:not(#page-' + p + ')').forEach(el => el.style.display = 'none');
 
-    // 3. 네비게이션 버튼 활성화
     document.querySelectorAll('.nav button').forEach(btn => {
         btn.classList.toggle('active', btn.id === 'nav-' + p);
     });
 
-    // 4. 입력창 초기화
     document.querySelectorAll('input').forEach(input => {
         if (!['nfc-bridge', 'cfg-url'].includes(input.id) && input.type !== 'button') {
             input.value = "";
         }
     });
 
-    // 5. 결과 영역 초기화
-    ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'].forEach(id => {
+    const resultContainers = ['checkin-result', 'search-results', 'point-target-area', 'card-target-area'];
+    resultContainers.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = "";
     });
 
-    // 6. 페이지별 특수 로직 실행
     if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
     if (p === 'add') refreshSchema(false);
-    if (p === 'schedule') updateScheduleDashboard(); // 스케쥴 페이지 진입 시 데이터 갱신
+    if (p === 'schedule') updateScheduleDashboard();
 
-    // 7. 포커스 관리
     isUserTyping = false;
     updateFocusUI();
     
-    // 해당 페이지의 전용 입력창이 있으면 포커스
     if (PAGE_CONFIG[p] && PAGE_CONFIG[p].inputId) {
         const inputEl = document.getElementById(PAGE_CONFIG[p].inputId);
         if(inputEl) setTimeout(() => inputEl.focus(), 100);
@@ -421,7 +403,6 @@ function showPage(p) {
     }
 }
 
-// 관리자 모드 토글
 function toggleAdmin() {
     if (!isAdmin) {
         isAdmin = true;
@@ -450,7 +431,6 @@ function updateAdminUI() {
     if (lockBtn) lockBtn.innerText = isAdmin ? "🔓" : "🔒";
 }
 
-// 설정 및 스키마 관리
 async function saveSettings() {
     const url = document.getElementById('cfg-url').value.trim();
     localStorage.setItem('GAS_URL', url);
@@ -504,8 +484,7 @@ function renderAddFields() {
 }
 
 /* ==========================================================================
-   [Module 8] 하드웨어 인터페이스 (NFC & Focus)
-   - NFC 리더기 입력 감지 및 포커스 제어
+   [Module 9] 하드웨어 인터페이스 (NFC & Focus)
    ========================================================================== */
 function updateFocusUI() {
     const indicator = document.getElementById('focus-indicator');
