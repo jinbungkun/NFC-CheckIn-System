@@ -97,3 +97,18 @@ input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px
     color: #b71c1c;
     opacity: 0.8; /* 아직 안 온 느낌 */
 }
+
+/* 출석한 날짜 표시 스타일 */
+.day-num.is-present {
+    background-color: #2b8a3e !important; /* 초록색 */
+    color: white !important;
+    border-radius: 50%; /* 동그라미 모양 */
+    font-weight: bold;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+/* 오늘 날짜 표시 스타일 (선택사항) */
+.day-num.is-today {
+    border: 2px solid #4dabf7;
+    color: #4dabf7;
+}
