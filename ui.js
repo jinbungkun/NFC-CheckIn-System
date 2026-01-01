@@ -87,51 +87,56 @@ const UI = {
     // --- [새로 추가된 현황판 렌더링 로직] ---
     
     // 4. 출석 현황판 렌더링
-    renderStatusBoard(groupedData, summary) {
-        const board = document.getElementById('status-board');
-        const summaryDiv = document.getElementById('status-summary');
-        if (!board || !summaryDiv) return;
+    renderScheduleBoard(groupedData, summary) {
+    // index.html에 있는 ID와 일치해야 합니다.
+    const board = document.getElementById('schedule-board'); 
+    const summaryDiv = document.getElementById('schedule-summary');
+    
+    if (!board || !summaryDiv) {
+        console.error("화면 요소를 찾을 수 없습니다: schedule-board 또는 schedule-summary");
+        return;
+    }
 
-        // 상단 요약 바 렌더링
-        summaryDiv.innerHTML = `
-            <div class="summary-item total">대상: <strong>${summary.total}</strong></div>
-            <div class="summary-item present">출석: <strong>${summary.present}</strong></div>
-            <div class="summary-item absent">미출석: <strong>${summary.absent}</strong></div>
+    // 상단 요약 바 렌더링
+    summaryDiv.innerHTML = `
+        <div class="summary-item total">대상: <strong>${summary.total}</strong></div>
+        <div class="summary-item present">출석: <strong>${summary.present}</strong></div>
+        <div class="summary-item absent">미출석: <strong>${summary.absent}</strong></div>
+    `;
+
+    board.innerHTML = "";
+    const sortedTimes = Object.keys(groupedData).sort();
+
+    if (sortedTimes.length === 0) {
+        board.innerHTML = "<div class='empty-msg' style='text-align:center; padding:50px; color:var(--muted);'>오늘 예정된 수업이 없습니다.</div>";
+        return;
+    }
+
+    sortedTimes.forEach(time => {
+        const section = document.createElement('div');
+        section.className = 'time-section';
+        
+        const students = groupedData[time];
+        section.innerHTML = `
+            <div class="time-title" style="font-weight:bold; margin: 20px 0 10px 0; font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px;">
+                ${time} 수업
+            </div>
+            <div class="status-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:10px;">
+                ${students.map(s => `
+                    <div class="status-card ${s.isPresent ? 'is-present' : 'is-absent'}" 
+                         style="padding:15px 10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #dee2e6; 
+                                background-color: ${s.isPresent ? '#ebfbee' : '#fff5f5'}; 
+                                border-color: ${s.isPresent ? '#b2f2bb' : '#ffc9c9'}; 
+                                color: ${s.isPresent ? '#2b8a3e' : '#c92a2a'};">
+                        <div style="margin-bottom:5px;">${s.name}</div>
+                        <div style="font-size:1.2rem;">${s.isPresent ? '✅' : '❌'}</div>
+                    </div>
+                `).join('')}
+            </div>
         `;
-
-        board.innerHTML = "";
-        const sortedTimes = Object.keys(groupedData).sort();
-
-        if (sortedTimes.length === 0) {
-            board.innerHTML = "<div class='empty-msg' style='text-align:center; padding:50px; color:var(--muted);'>오늘 예정된 수업이 없습니다.</div>";
-            return;
-        }
-
-        sortedTimes.forEach(time => {
-            const section = document.createElement('div');
-            section.className = 'time-section';
-            
-            const students = groupedData[time];
-            section.innerHTML = `
-                <div class="time-title" style="font-weight:bold; margin: 20px 0 10px 0; font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px;">
-                    ${time} 수업
-                </div>
-                <div class="status-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:10px;">
-                    ${students.map(s => `
-                        <div class="status-card ${s.isPresent ? 'is-present' : 'is-absent'}" 
-                             style="padding:15px 10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #dee2e6; 
-                                    background-color: ${s.isPresent ? '#ebfbee' : '#fff5f5'}; 
-                                    border-color: ${s.isPresent ? '#b2f2bb' : '#ffc9c9'}; 
-                                    color: ${s.isPresent ? '#2b8a3e' : '#c92a2a'};">
-                            <div style="margin-bottom:5px;">${s.name}</div>
-                            <div style="font-size:1.2rem;">${s.isPresent ? '✅' : '❌'}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            board.appendChild(section);
-        });
-    },
+        board.appendChild(section);
+    });
+},
 
     renderPointActions(id) {
         return `
