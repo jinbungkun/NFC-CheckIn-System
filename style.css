@@ -188,3 +188,27 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 }
 .student-status-card.is-present .name { font-weight: 700; color: var(--text); }
 .student-status-card.is-present .status-indicator { color: var(--success); font-size: 0.7rem; font-weight: 800; margin-top: 5px; }
+
+/* 생일 카드 전용 스타일 */
+.student-status-card.is-birthday {
+    border-color: #ffcfd2 !important; /* 부드러운 분홍색 테두리 */
+    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255, 182, 193, 0.05));
+}
+
+.birthday-tag {
+    font-size: 0.65rem;
+    color: #ff6b6b;
+    font-weight: 800;
+    margin-bottom: 4px;
+    animation: bounce 2s infinite; /* 살짝 움직이는 효과 */
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+/* 생일인 경우 이름 색상 살짝 강조 (선택사항) */
+.is-birthday .name {
+    color: #ff9f9f;
+}
