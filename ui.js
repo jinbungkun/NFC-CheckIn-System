@@ -1,29 +1,40 @@
 /* ==========================================================================
    [ui.js] - 통합 CSS를 활용한 UI 최적화 버전
    ========================================================================== */
+
+let checkinTimer = null;
+
 const UI = {
     // 1. 체크인 결과 표시 (성공/실패 피드백)
 renderCheckinUI(name, msg, color, point) {
-    const target = document.getElementById('checkin-result');
-    if (!target) return;
+        const target = document.getElementById('checkin-result');
+        if (!target) return;
 
-    // 포인트가 0일 수도 있으므로 정확히 체크
-    const hasPoint = (point !== undefined && point !== null);
-    const pointHtml = hasPoint 
-        ? `<div class="result-point">현재 보유 포인트: <span>${Number(point).toLocaleString()}</span> pt</div>` 
-        : "";
+        // 2. [핵심] 만약 3.5초가 지나기 전이라면, 이전의 '삭제 예약'을 취소함
+        if (checkinTimer) {
+            clearTimeout(checkinTimer);
+        }
 
-    target.innerHTML = `
-        <div class="result-wrapper">
-            <div class="result-card" style="border-color: ${color};">
-                <h3 class="result-name" style="color: ${color};">${name}</h3>
-                ${pointHtml}
-                <p class="result-msg" style="color: ${color === 'var(--success)' ? 'var(--text)' : color}">${msg}</p>
-            </div>
-        </div>`;
-    
-    setTimeout(() => { target.innerHTML = ""; }, 3500);
-},
+        const hasPoint = (point !== undefined && point !== null);
+        const pointHtml = hasPoint 
+            ? `<div class="result-point">현재 보유 포인트: <span>${Number(point).toLocaleString()}</span> pt</div>` 
+            : "";
+
+        target.innerHTML = `
+            <div class="result-wrapper">
+                <div class="result-card" style="border-color: ${color};">
+                    <h3 class="result-name" style="color: ${color};">${name}</h3>
+                    ${pointHtml}
+                    <p class="result-msg">${msg}</p>
+                </div>
+            </div>`;
+        
+        // 3. 다시 새롭게 3.5초 타이머를 맞춥니다.
+        checkinTimer = setTimeout(() => {
+            target.innerHTML = "";
+            checkinTimer = null;
+        }, 3500);
+    },
 
     // 2. 검색/조회 결과 렌더링
     renderResults(data, type) {
