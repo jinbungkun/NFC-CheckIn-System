@@ -152,18 +152,23 @@ renderCheckinUI(name, msg, color, point) {
         section.className = "time-section";
         
         // 학생 카드 생성
-        const studentCards = groupedData[time].map(s => {
-            // [체크] s.birth에 오늘 날짜(MM-DD)가 포함되어 있는지 확인
-            const isBirthday = s.birth && s.birth.includes(todayMMDD);
-            
-            return `
-                <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'} ${isBirthday ? 'is-birthday' : ''}">
-                    ${isBirthday ? '<div class="birthday-tag">🎂 생일</div>' : ''}
-                    <div class="name">${s.name}</div>
-                    <div class="status-indicator">${s.isPresent ? '출석완료' : '미출석'}</div>
+     const studentCards = groupedData[time].map(s => {
+    const isBirthday = s.birth && s.birth.includes(todayMMDD);
+    
+    return `
+        <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'} ${isBirthday ? 'is-birthday' : ''}">
+            ${isBirthday ? `
+                <div class="birthday-badge">
+                    <span class="cake-icon">🎂</span>
                 </div>
-            `;
-        }).join('');
+            ` : ''}
+            <div class="card-content">
+                <div class="name">${s.name}</div>
+                <div class="status-indicator">${s.isPresent ? '출석완료' : '미출석'}</div>
+            </div>
+        </div>
+    `;
+}).join('');
 
         section.innerHTML = `
             <div class="time-header">🕒 ${time} 수업</div>

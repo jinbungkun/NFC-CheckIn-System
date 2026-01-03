@@ -179,36 +179,63 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .student-status-card.is-absent .name { color: var(--muted); }
 .student-status-card.is-absent .status-indicator { color: var(--danger); font-size: 0.7rem; font-weight: 600; margin-top: 5px; }
 
-/* 출석 상태: 선명하게 강조 */
-.student-status-card.is-present {
-    background: rgba(16,185,129,0.1);
-    border-color: var(--success);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16,185,129,0.1);
-}
-.student-status-card.is-present .name { font-weight: 700; color: var(--text); }
-.student-status-card.is-present .status-indicator { color: var(--success); font-size: 0.7rem; font-weight: 800; margin-top: 5px; }
-
-/* 생일 카드 전용 스타일 */
+/* --- 생일 학생 카드 특별 스타일 --- */
 .student-status-card.is-birthday {
-    border-color: #ffcfd2 !important; /* 부드러운 분홍색 테두리 */
-    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255, 182, 193, 0.05));
+    position: relative;
+    padding-left: 45px !important; /* 왼쪽에 아이콘 들어갈 공간 확보 */
+    border: 2px solid transparent !important;
+    background-image: linear-gradient(var(--bg), var(--bg)), 
+                      linear-gradient(45deg, #ff9a9e, #fad0c4, #fad0c4, #ffd1ff);
+    background-origin: border-box;
+    background-clip: content-box, border-box;
+    overflow: visible !important;
+    box-shadow: 0 0 15px rgba(255, 182, 193, 0.4);
+    animation: celebrate-border 3s linear infinite;
 }
 
-.birthday-tag {
-    font-size: 0.65rem;
-    color: #ff6b6b;
-    font-weight: 800;
-    margin-bottom: 4px;
-    animation: bounce 2s infinite; /* 살짝 움직이는 효과 */
+/* 왼쪽 배치된 생일 뱃지 */
+.birthday-badge {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 2;
 }
 
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-2px); }
+.cake-icon {
+    font-size: 1.2rem;
+    animation: party-wiggle 1s ease-in-out infinite;
 }
 
-/* 생일인 경우 이름 색상 살짝 강조 (선택사항) */
-.is-birthday .name {
-    color: #ff9f9f;
+/* 출석 상태 테두리 유지 (생일인 경우에도 하단에 상태선 표시) */
+.student-status-card.is-birthday.is-present {
+    border-bottom: 4px solid var(--success) !important;
+}
+
+/* 생일 테두리 빛나는 애니메이션 */
+@keyframes celebrate-border {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
+
+/* 케이크 아이콘 흔들기 애니메이션 */
+@keyframes party-wiggle {
+    0%, 100% { transform: rotate(-10deg) scale(1.1); }
+    50% { transform: rotate(10deg) scale(1.2); }
+}
+
+/* 카드 내용 정렬 */
+.card-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
 }
