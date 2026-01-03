@@ -3,20 +3,23 @@
    ========================================================================== */
 const UI = {
     // 1. 체크인 결과 표시 (성공/실패 피드백)
-    renderCheckinUI(name, msg, color) {
-        const target = document.getElementById('checkin-result');
-        if (!target) return;
+renderCheckinUI(name, msg, color) {
+    const target = document.getElementById('checkin-result');
+    if (!target) return;
 
-        // 인라인 스타일 대신 클래스와 CSS 변수 활용
-        target.innerHTML = `
-            <div class="result-card" style="border: 2px solid ${color}; background: rgba(0,0,0,0.2); text-align:center; padding: 20px; border-radius: 20px; margin-bottom: 20px;">
-                <h3 style="color:${color}; margin: 0 0 10px 0; font-size: 1.6rem;">${name}</h3>
-                <p style="margin: 0; font-weight: bold; color: var(--text);">${msg}</p>
-            </div>`;
-        
-        // 3초 후 자동 삭제 (다음 사람을 위한 배려)
-        setTimeout(() => { target.innerHTML = ""; }, 3500);
-    },
+    // 인라인 스타일을 거의 제거하고 클래스 위주로 재구성
+    // border-color만 동적으로 받아오도록 설정
+    target.innerHTML = `
+        <div class="result-wrapper">
+            <div class="result-card" style="border-color: ${color};">
+                <h3 class="result-name" style="color: ${color};">${name}</h3>
+                <p class="result-msg">${msg}</p>
+            </div>
+        </div>`;
+    
+    // 3.5초 후 자동 삭제
+    setTimeout(() => { target.innerHTML = ""; }, 3500);
+},
 
     // 2. 검색/조회 결과 렌더링
     renderResults(data, type) {
