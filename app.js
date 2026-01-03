@@ -138,36 +138,33 @@ async function doCheckin() {
     const student = quickMap[id];
     const today = new Date().toLocaleDateString('sv-SE');
 
-    // 1. 이미 출석한 경우: 현재 포인트 표시
+    // 1. 이미 출석한 경우: 현재 보유 포인트 표시 (수정됨)
     if (student && student.lastDate === today) {
+        // quickMap에 저장된 현재 포인트를 그대로 가져와서 표시
         renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)", student.point);
         return;
     }
 
-    // 2. 등록된 학생이 출석하는 경우
+    // 2. 등록된 학생이 처음 출석하는 경우
     if (student) {
+        // 포인트 추가(+10) 없이 현재 포인트 그대로 표시
+        renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)", student.point);
+        
         student.lastDate = today;
-        student.point = (Number(student.point) || 0) + 10; // 먼저 로컬 데이터 업데이트
-
-        // UI에 업데이트된 포인트 전달
-        renderCheckinUI(student.name, "출석 성공! +10pt ✅", "var(--success)", student.point);
 
         callApi({ action: 'checkin', id: id, row: student.row }, false).then(res => {
             if (!res || !res.success) {
                 renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
-            } else if (res.newTotal !== undefined) {
-                // 서버에서 응답받은 최종 포인트로 동기화 (선택 사항)
-                student.point = res.newTotal;
             }
         });
     } 
-    // 3. 미등록 카드이거나 첫 출석인 경우
+    // 3. 미등록 카드이거나 신규 학생인 경우
     else {
         const res = await callApi({ action: 'checkin', id: id }, true);
         if (res && res.success) {
-            // 서버에서 새로 등록된 학생의 이름과 포인트를 받아 표시
-            renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point || 10);
-            await initQuickMap(); // 전체 데이터 새로고침
+            // 서버에서 응답받은 포인트 표시
+            renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point);
+            await initQuickMap();
         } else {
             renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
         }

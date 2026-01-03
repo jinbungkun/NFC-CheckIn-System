@@ -7,9 +7,10 @@ renderCheckinUI(name, msg, color, point) {
     const target = document.getElementById('checkin-result');
     if (!target) return;
 
-    // 포인트가 있으면 표시용 HTML 생성
-    const pointHtml = (point !== undefined && point !== null) 
-        ? `<div class="result-point">보유 포인트: <span>${Number(point).toLocaleString()}</span> pt</div>` 
+    // 포인트가 0일 수도 있으므로 정확히 체크
+    const hasPoint = (point !== undefined && point !== null);
+    const pointHtml = hasPoint 
+        ? `<div class="result-point">현재 보유 포인트: <span>${Number(point).toLocaleString()}</span> pt</div>` 
         : "";
 
     target.innerHTML = `
@@ -17,7 +18,7 @@ renderCheckinUI(name, msg, color, point) {
             <div class="result-card" style="border-color: ${color};">
                 <h3 class="result-name" style="color: ${color};">${name}</h3>
                 ${pointHtml}
-                <p class="result-msg">${msg}</p>
+                <p class="result-msg" style="color: ${color === 'var(--success)' ? 'var(--text)' : color}">${msg}</p>
             </div>
         </div>`;
     
