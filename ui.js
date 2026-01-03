@@ -3,21 +3,24 @@
    ========================================================================== */
 const UI = {
     // 1. 체크인 결과 표시 (성공/실패 피드백)
-renderCheckinUI(name, msg, color) {
+renderCheckinUI(name, msg, color, point) {
     const target = document.getElementById('checkin-result');
     if (!target) return;
 
-    // 인라인 스타일을 거의 제거하고 클래스 위주로 재구성
-    // border-color만 동적으로 받아오도록 설정
+    // 포인트가 있으면 표시용 HTML 생성
+    const pointHtml = (point !== undefined && point !== null) 
+        ? `<div class="result-point">보유 포인트: <span>${Number(point).toLocaleString()}</span> pt</div>` 
+        : "";
+
     target.innerHTML = `
         <div class="result-wrapper">
             <div class="result-card" style="border-color: ${color};">
                 <h3 class="result-name" style="color: ${color};">${name}</h3>
+                ${pointHtml}
                 <p class="result-msg">${msg}</p>
             </div>
         </div>`;
     
-    // 3.5초 후 자동 삭제
     setTimeout(() => { target.innerHTML = ""; }, 3500);
 },
 
