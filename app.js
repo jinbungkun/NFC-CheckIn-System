@@ -121,7 +121,7 @@ function findByNfc(id, pageType) {
         renderResults(found, pageType); // found 역시 배열입니다.
     } else {
         // [UI 개선] alert 대신 UI 함수 사용 가능
-        renderCheckinUI("미등록", `미등록 카드: ${id}`, "var(--danger)");
+        renderCheckinUI("미등록", `미등록 카드: ${id}`, "var(--danger)",null);
     }
 }
 
@@ -138,16 +138,14 @@ async function doCheckin() {
     const student = quickMap[id];
     const today = new Date().toLocaleDateString('sv-SE');
 
-    // 1. 이미 출석한 경우
+    // 1. 이미 출석한 경우: 현재 포인트 표시
     if (student && student.lastDate === today) {
-        // [중요] 4번째 인자로 student.point를 보냅니다.
         renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)", student.point);
         return;
     }
 
     // 2. 처음 출석하는 경우
     if (student) {
-        // 여기도 4번째 인자로 현재 포인트를 보냅니다.
         renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)", student.point);
         
         student.lastDate = today;
@@ -161,31 +159,13 @@ async function doCheckin() {
     else {
         const res = await callApi({ action: 'checkin', id: id }, true);
         if (res && res.success) {
-            // 서버에서 응답받은 포인트(res.point)를 보냅니다.
             renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point);
             await initQuickMap();
         } else {
-            renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)");
+            // 미등록 시 포인트 자리는 null로 전달
+            renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)", null);
         }
     }
-}
-
-async function doManualCheckin(id) {
-    const student = quickMap[id];
-    if (!student) return;
-
-    const today = new Date().toLocaleDateString('sv-SE');
-    if (student.lastDate === today) {
-        alert("이미 오늘 출석했습니다.");
-        return;
-    }
-
-    renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)");
-    student.lastDate = today;
-    student.point = (Number(student.point) || 0) + 10;
-
-    await callApi({ action: 'checkin', id: id, row: student.row }, false);
-    initQuickMap();
 }
 
 function getTodayClassTime(scheduleStr) {
@@ -387,7 +367,7 @@ function changeMonthUI(id, delta) {
    [Module 8] UI 브릿지 및 페이지 네비게이션
    ========================================================================== */
 function renderResults(data, type) { if(window.UI) UI.renderResults(data, type); }
-function renderCheckinUI(name, msg, color) { if(window.UI) UI.renderCheckinUI(name, msg, color); }
+function renderCheckinUI(name, msg, color, point) { if(window.UI) UI.renderCheckinUI(name, msg, color, point); }
 
 function showPage(p) {
     document.querySelectorAll('.page').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });

@@ -56,8 +56,7 @@ renderCheckinUI(name, msg, color, point) {
                             <div class="info-item">💰 포인트: <span class="info-value" style="color:var(--accent); font-weight:bold;">${Number(s.포인트).toLocaleString()} pt</span></div>
                             <div class="info-item">📅 수업: <span class="info-value">${s.수업스케줄 || '정보 없음'}</span></div>
                         </div>
-                        
-                        <button class="btn btn-primary" onclick="doManualCheckin('${s.ID}')" style="margin-top:20px; font-size:0.9rem; padding:12px;">수동 출석 처리</button>
+                               
                     </div>
 
                     <div class="dash-calendar">
