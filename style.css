@@ -193,45 +193,47 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .student-status-card.is-birthday {
     position: relative !important;
     padding-left: 45px !important;
-    border: none !important; /* 이름 뒤 배경을 만드는 주범인 테두리 기법 제거 */
+    border: none !important;
     
-    /* 카드 전체에 그라데이션 적용 */
-    background: linear-gradient(45deg, #ff9a9e, #fad0c4, #ffd1ff, #3b82f6) !important;
+    /* [수정] 채도를 낮춘 파스텔톤 그라데이션 (부드러운 색감) */
+    background: linear-gradient(45deg, #eecda3, #efbbcf, #e4dcf1, #c3cfe2) !important;
     background-size: 200% 200% !important;
     
-    overflow: visible !important;
-    box-shadow: 0 4px 15px rgba(255, 182, 193, 0.5) !important;
-    animation: celebrate-gradient 3s ease infinite !important;
+    overflow: hidden !important; /* ::before 막이 삐져나가지 않게 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    animation: celebrate-gradient 4s ease infinite !important;
 }
 
+/* 글씨 강조를 위한 미세하게 어두운 막 */
 .student-status-card.is-birthday::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.1); /* 미세하게 어두운 막을 씌워 글씨 강조 */
-    border-radius: 12px;
-    z-index: 1; /* 글자보다는 뒤에, 배경보다는 위에 위치 */
+    background: rgba(0, 0, 0, 0.05); /* 채도를 낮췄으므로 아주 살짝만 어둡게 */
+    z-index: 1;
 }
 
-/* 생일 카드 안의 텍스트 가독성 (어두운 배경이 없으므로 그림자 추가) */
+/* 생일 카드 안의 텍스트 설정 (막 위로 올리기) */
 .student-status-card.is-birthday .name {
-    color: white !important;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    position: relative;
+    z-index: 2;
+    color: #475569 !important; /* 글씨색을 완전 흰색 대신 진한 회색으로 변경해 가독성 높임 */
     font-weight: 800;
 }
 
 .student-status-card.is-birthday .status-indicator {
-    color: white !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    opacity: 0.9;
+    position: relative;
+    z-index: 2;
+    color: #64748b !important;
+    font-weight: 700;
 }
 
-/* 생일이면서 출석까지 했을 때: 하단에 초록색 강조선 추가 */
+/* 출석 시 하단 초록색 바 */
 .student-status-card.is-birthday.is-present {
-    border-bottom: 4px solid var(--success) !important;
+    border-bottom: 5px solid var(--success) !important;
 }
 
-/* 왼쪽에 배치될 원형 생일 뱃지 */
+/* 뱃지 위치 조정 (z-index 추가) */
 .birthday-badge {
     position: absolute;
     left: 8px;
@@ -244,24 +246,13 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    z-index: 2;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    z-index: 3; /* 가장 위에 배치 */
 }
 
-/* 🎂 아이콘 흔들거리는 애니메이션 */
-.cake-icon {
-    font-size: 1.1rem;
-    animation: party-wiggle 1s ease-in-out infinite;
-}
-
-/* 테두리 색상이 계속 변하는 효과 */
-@keyframes celebrate-border {
-    0% { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
-}
-
-/* 케이크 흔들기 효과 */
-@keyframes party-wiggle {
-    0%, 100% { transform: rotate(-10deg) scale(1.1); }
-    50% { transform: rotate(10deg) scale(1.2); }
+/* 애니메이션 및 케이크 아이콘은 기존 유지 */
+@keyframes celebrate-gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
