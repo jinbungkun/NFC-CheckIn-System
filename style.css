@@ -124,3 +124,67 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
   .nav button { padding: 12px 10px; font-size: 0.8rem; }
   .page { padding: 18px; }
 }
+
+/* 상단 요약 카드 */
+#schedule-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 30px;
+}
+.summary-card {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid var(--border);
+    background: var(--bg);
+}
+.summary-card .label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+.summary-card .value { font-size: 1.2rem; font-weight: 800; }
+.summary-card.present { border-color: var(--success); background: rgba(16,185,129,0.05); }
+.summary-card.present .value { color: var(--success); }
+.summary-card.absent { border-color: var(--danger); background: rgba(239,68,68,0.05); }
+.summary-card.absent .value { color: var(--danger); }
+
+/* 시간대 헤더 */
+.time-header {
+    font-weight: 700;
+    margin: 35px 0 15px 0;
+    color: var(--accent);
+    font-size: 1.05rem;
+    letter-spacing: -0.5px;
+}
+
+/* 학생 그리드 및 카드 */
+.student-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+}
+.student-status-card {
+    padding: 15px 10px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+/* 미출석 상태: 흐리게 처리 */
+.student-status-card.is-absent {
+    background: transparent;
+    opacity: 0.6;
+}
+.student-status-card.is-absent .name { color: var(--muted); }
+.student-status-card.is-absent .status-indicator { color: var(--danger); font-size: 0.7rem; font-weight: 600; margin-top: 5px; }
+
+/* 출석 상태: 선명하게 강조 */
+.student-status-card.is-present {
+    background: rgba(16,185,129,0.1);
+    border-color: var(--success);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16,185,129,0.1);
+}
+.student-status-card.is-present .name { font-weight: 700; color: var(--text); }
+.student-status-card.is-present .status-indicator { color: var(--success); font-size: 0.7rem; font-weight: 800; margin-top: 5px; }

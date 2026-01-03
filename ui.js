@@ -111,40 +111,58 @@ renderCheckinUI(name, msg, color, point) {
 
     // 4. 출석 현황판 (스케줄 대시보드)
     renderScheduleBoard(groupedData, summary) {
-        const board = document.getElementById('schedule-board'); 
-        const summaryDiv = document.getElementById('schedule-summary');
-        if (!board || !summaryDiv) return;
+    const board = document.getElementById('schedule-board'); 
+    const summaryDiv = document.getElementById('schedule-summary');
+    if (!board || !summaryDiv) return;
 
-        summaryDiv.innerHTML = `
-            <div class="summary-item" style="background:var(--border); color:var(--text);">대상: <strong>${summary.total}</strong></div>
-            <div class="summary-item" style="background:rgba(16,185,129,0.2); color:var(--success);">출석: <strong>${summary.present}</strong></div>
-            <div class="summary-item" style="background:rgba(239,68,68,0.2); color:var(--danger);">미출석: <strong>${summary.absent}</strong></div>
-        `;
+    // 상단 요약 바 디자인 개선
+    summaryDiv.innerHTML = `
+        <div class="summary-card total">
+            <span class="label">대상</span>
+            <span class="value">${summary.total}</span>
+        </div>
+        <div class="summary-card present">
+            <span class="label">출석</span>
+            <span class="value">${summary.present}</span>
+        </div>
+        <div class="summary-card absent">
+            <span class="label">미출석</span>
+            <span class="value">${summary.absent}</span>
+        </div>
+    `;
 
-        board.innerHTML = "";
-        const sortedTimes = Object.keys(groupedData).sort();
+    board.innerHTML = "";
+    const sortedTimes = Object.keys(groupedData).sort();
 
-        if (sortedTimes.length === 0) {
-            board.innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>오늘 예정된 수업이 없습니다.</p>";
-            return;
-        }
+    if (sortedTimes.length === 0) {
+        board.innerHTML = `
+            <div style="text-align:center; padding:80px 0; color:var(--muted);">
+                <div style="font-size: 3rem; margin-bottom: 10px;">📅</div>
+                <p>오늘 예정된 수업이 없습니다.</p>
+            </div>`;
+        return;
+    }
 
-        sortedTimes.forEach(time => {
-            const section = document.createElement('div');
-            section.className = "time-section";
-            section.innerHTML = `
-                <div style="font-weight:bold; margin: 30px 0 10px 0; color:var(--accent); font-size:1.1rem;">🕒 ${time} 수업</div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:12px;">
-                    ${groupedData[time].map(s => `
-                        <div style="padding:15px 5px; border-radius:15px; text-align:center; border:1px solid ${s.isPresent ? 'var(--success)' : 'var(--border)'}; background:${s.isPresent ? 'rgba(16,185,129,0.1)' : 'transparent'};">
-                            <div style="font-size:0.9rem; margin-bottom:5px;">${s.name}</div>
-                            <div style="font-size:1.2rem;">${s.isPresent ? '✅' : '⚪'}</div>
-                        </div>
-                    `).join('')}
-                </div>`;
-            board.appendChild(section);
-        });
-    },
+    sortedTimes.forEach(time => {
+        const section = document.createElement('div');
+        section.className = "time-section";
+        
+        // 학생 카드 생성
+        const studentCards = groupedData[time].map(s => `
+            <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'}">
+                <div class="name">${s.name}</div>
+                <div class="status-indicator">${s.isPresent ? '출석완료' : '결석'}</div>
+            </div>
+        `).join('');
+
+        section.innerHTML = `
+            <div class="time-header">🕒 ${time} 수업</div>
+            <div class="student-grid">
+                ${studentCards}
+            </div>`;
+        board.appendChild(section);
+    });
+},
 
     // 5. 포인트 액션
     renderPointActions(id) {
