@@ -1,17 +1,21 @@
 /* ==========================================================================
-   [ui.js] - 모든 시각적 요소 생성을 담당
+   [ui.js] - 통합 CSS를 활용한 UI 최적화 버전
    ========================================================================== */
 const UI = {
-    // 1. 체크인 결과 표시
+    // 1. 체크인 결과 표시 (성공/실패 피드백)
     renderCheckinUI(name, msg, color) {
         const target = document.getElementById('checkin-result');
-        if (target) {
-            target.innerHTML = `
-                <div class="student-info-card" style="text-align:center; border: 2px solid ${color}; padding: 15px; border-radius: 12px; background: rgba(0,0,0,0.2); margin-bottom: 20px;">
-                    <h3 style="color:${color}; margin: 5px 0; font-size: 1.5rem;">${name}</h3>
-                    <p style="margin: 5px 0; font-weight: bold; color: white;">${msg}</p>
-                </div>`;
-        }
+        if (!target) return;
+
+        // 인라인 스타일 대신 클래스와 CSS 변수 활용
+        target.innerHTML = `
+            <div class="result-card" style="border: 2px solid ${color}; background: rgba(0,0,0,0.2); text-align:center; padding: 20px; border-radius: 20px; margin-bottom: 20px;">
+                <h3 style="color:${color}; margin: 0 0 10px 0; font-size: 1.6rem;">${name}</h3>
+                <p style="margin: 0; font-weight: bold; color: var(--text);">${msg}</p>
+            </div>`;
+        
+        // 3초 후 자동 삭제 (다음 사람을 위한 배려)
+        setTimeout(() => { target.innerHTML = ""; }, 3500);
     },
 
     // 2. 검색/조회 결과 렌더링
@@ -21,43 +25,50 @@ const UI = {
         if (!container) return;
         
         if (!data || data.length === 0) { 
-            container.innerHTML = `<p style="text-align:center; padding:20px; color:var(--muted);">결과가 없습니다.</p>`; 
+            container.innerHTML = `<p class="empty-msg" style="text-align:center; padding:40px; color:var(--muted);">검색 결과가 없습니다.</p>`; 
             return; 
         }
 
         container.innerHTML = data.map(s => {
-            const statusColor = s.상태 === '재원' ? '#4CAF50' : (s.상태 === '휴원' ? '#FF9800' : '#F44336');
+            const statusClass = s.상태 === '재원' ? 'badge-success' : 'badge-danger';
             
             if (type === 'search') {
                 return `
-                <div class="student-dashboard-card" style="background:var(--card-bg); border-radius:12px; padding:20px; margin-bottom:20px; border:1px solid #444;">
+                <div class="student-dashboard-card">
                     <div class="dash-info">
-                        <div class="info-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <span class="student-name" style="font-size:1.4rem; font-weight:bold; color:white;">${s.이름}</span>
-                            <span class="status-badge" style="background:${statusColor}; padding:4px 10px; border-radius:20px; font-size:0.8rem;">${s.상태 || '재원'}</span>
+                        <div class="info-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <span class="student-name">${s.이름}</span>
+                                <div class="info-item" style="margin-top:5px;">🎂 <span class="info-value">${s.생년월일 || '-'}</span></div>
+                            </div>
+                            <span class="status-badge ${statusClass}" style="padding:4px 12px; border-radius:20px; font-size:0.8rem; background:rgba(255,255,255,0.1); border:1px solid currentColor;">${s.상태 || '재원'}</span>
                         </div>
-                        <div class="info-body" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; color:#ccc; font-size:0.95rem;">
-                            <div class="info-item">🎂 ${s.생년월일 || '-'}</div>
-                            <div class="info-item">📱 ${s.전화번호 || '-'}</div>
-                            <div class="info-item">💰 <span class="point-val" style="color:var(--accent); font-weight:bold;">${s.포인트} pt</span></div>
-                            <div class="info-item" style="grid-column: span 2;">📅 수업: ${s.수업스케줄 || '정보 없음'}</div>
-                        </div
+                        
+                        <div class="info-body" style="margin-top:20px; display:grid; grid-template-columns:1fr; gap:12px;">
+                            <div class="info-item">📱 연락처: <span class="info-value">${s.전화번호 || '-'}</span></div>
+                            <div class="info-item">💰 포인트: <span class="info-value" style="color:var(--accent); font-weight:bold;">${Number(s.포인트).toLocaleString()} pt</span></div>
+                            <div class="info-item">📅 수업: <span class="info-value">${s.수업스케줄 || '정보 없음'}</span></div>
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="doManualCheckin('${s.ID}')" style="margin-top:20px; font-size:0.9rem; padding:12px;">수동 출석 처리</button>
                     </div>
-                    <div class="dash-calendar" style="margin-top:20px; border-top: 1px solid #444; padding-top:20px;">
-                        <div class="cal-nav" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', -1)" style="background:none; border:none; color:white; cursor:pointer;">◀</button>
-                            <span class="cal-label" id="cal-label-${s.ID}" style="font-weight:bold; color:white;">0000년 00월</span>
-                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', 1)" style="background:none; border:none; color:white; cursor:pointer;">▶</button>
+
+                    <div class="dash-calendar">
+                        <div class="cal-nav">
+                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', -1)">◀</button>
+                            <span class="cal-label" id="cal-label-${s.ID}">로딩 중...</span>
+                            <button class="cal-btn" onclick="changeMonthUI('${s.ID}', 1)">▶</button>
                         </div>
-                        <div class="cal-grid" id="grid-${s.ID}" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:4px; text-align:center;">
-                            <div style="grid-column: span 7; padding: 20px; color: var(--muted); font-size: 0.8rem;">달력 로딩 중...</div>
+                        <div class="cal-grid" id="grid-${s.ID}">
+                            <div style="grid-column: span 7; padding: 40px; color: var(--muted);">달력 데이터를 가져오는 중...</div>
                         </div>
                     </div>
                 </div> `;
             }
-            return this.renderSimpleCard(s, type, statusColor);
+            return this.renderSimpleCard(s, type);
         }).join('');
 
+        // 달력 초기화 실행
         if (type === 'search') {
             data.forEach(s => {
                 setTimeout(() => { if(typeof window.initCalendarUI === 'function') window.initCalendarUI(s.ID); }, 50);
@@ -66,19 +77,15 @@ const UI = {
     },
 
     // 3. 심플 카드 (포인트/카드 관리용)
-    renderSimpleCard(s, type, statusColor) {
+    renderSimpleCard(s, type) {
         return `
-        <div class="student-info-card" style="margin-bottom:15px; background:var(--card-bg); padding:15px; border-radius:10px; border:1px solid #444;">
-            <div class="student-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="page" style="display:block; margin-bottom:15px; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <span style="font-size:1.2rem; font-weight:bold; color:white;">${s.이름}</span>
-                    <span class="status-badge" style="background:${statusColor}; font-size:0.7rem; padding:2px 8px; border-radius:10px; margin-left:5px;">${s.상태 || '재원'}</span>
+                    <strong style="font-size:1.2rem;">${s.이름}</strong>
+                    <span style="color:var(--muted); font-size:0.8rem; margin-left:8px;">${s.생년월일}</span>
                 </div>
-                <span style="color:var(--accent); font-weight:bold;">${s.포인트} pt</span>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin: 12px 0; font-size:0.9rem; color:#ccc;">
-                <div>🎂 ${s.생년월일 || '-'}</div>
-                <div>📱 ${s.전화번호 || '-'}</div>
+                <span style="color:var(--accent); font-weight:bold;">${Number(s.포인트).toLocaleString()} pt</span>
             </div>
             ${type === 'point' ? this.renderPointActions(s.ID) : ''}
             ${type === 'card' ? this.renderCardActions(s.ID, s.이름) : ''}
@@ -92,9 +99,9 @@ const UI = {
         if (!board || !summaryDiv) return;
 
         summaryDiv.innerHTML = `
-            <div class="summary-item total" style="background:#333; padding:10px 15px; border-radius:8px; color:white;">대상: <strong>${summary.total}</strong></div>
-            <div class="summary-item present" style="background:#2b8a3e; padding:10px 15px; border-radius:8px; color:white;">출석: <strong>${summary.present}</strong></div>
-            <div class="summary-item absent" style="background:#c92a2a; padding:10px 15px; border-radius:8px; color:white;">미출석: <strong>${summary.absent}</strong></div>
+            <div class="summary-item" style="background:var(--border); color:var(--text);">대상: <strong>${summary.total}</strong></div>
+            <div class="summary-item" style="background:rgba(16,185,129,0.2); color:var(--success);">출석: <strong>${summary.present}</strong></div>
+            <div class="summary-item" style="background:rgba(239,68,68,0.2); color:var(--danger);">미출석: <strong>${summary.absent}</strong></div>
         `;
 
         board.innerHTML = "";
@@ -107,13 +114,14 @@ const UI = {
 
         sortedTimes.forEach(time => {
             const section = document.createElement('div');
+            section.className = "time-section";
             section.innerHTML = `
-                <div style="font-weight:bold; margin: 25px 0 10px 0; font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px; color:white;">${time} 수업</div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:10px;">
+                <div style="font-weight:bold; margin: 30px 0 10px 0; color:var(--accent); font-size:1.1rem;">🕒 ${time} 수업</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:12px;">
                     ${groupedData[time].map(s => `
-                        <div style="padding:15px 5px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid ${s.isPresent ? '#2b8a3e' : '#c92a2a'}; background:${s.isPresent ? 'rgba(43,138,62,0.1)' : 'rgba(201,42,42,0.1)'}; color:white;">
-                            <div style="margin-bottom:5px; font-size:0.9rem;">${s.name}</div>
-                            <div>${s.isPresent ? '✅' : '❌'}</div>
+                        <div style="padding:15px 5px; border-radius:15px; text-align:center; border:1px solid ${s.isPresent ? 'var(--success)' : 'var(--border)'}; background:${s.isPresent ? 'rgba(16,185,129,0.1)' : 'transparent'};">
+                            <div style="font-size:0.9rem; margin-bottom:5px;">${s.name}</div>
+                            <div style="font-size:1.2rem;">${s.isPresent ? '✅' : '⚪'}</div>
                         </div>
                     `).join('')}
                 </div>`;
@@ -124,13 +132,13 @@ const UI = {
     // 5. 포인트 액션
     renderPointActions(id) {
         return `
-        <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
-            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:5px; margin-bottom:8px;">
-                ${[10, 50, 100].map(v => `<button class="btn btn-success" onclick="updatePt('${id}', ${v}, event)">+${v}</button>`).join('')}
+        <div style="border-top:1px solid var(--border); padding-top:15px; margin-top:15px;">
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:12px;">
+                ${[10, 50, 100].map(v => `<button class="btn btn-success" style="padding:10px; font-size:0.85rem;" onclick="updatePt('${id}', ${v}, event)">+${v}</button>`).join('')}
             </div>
-            <div style="display:flex; gap:5px;">
-                <input type="number" id="pt-inp-${id}" placeholder="직접 입력" style="flex:1; padding:8px; border-radius:4px; background:#333; color:white; border:1px solid #555;">
-                <button class="btn btn-primary" onclick="updatePtManual('${id}', event)">지급</button>
+            <div style="display:flex; gap:8px;">
+                <input type="number" id="pt-inp-${id}" placeholder="직접 입력" style="margin:0; flex:1;">
+                <button class="btn btn-primary" style="width:80px; padding:0;" onclick="updatePtManual('${id}', event)">지급</button>
             </div>
         </div>`;
     },
@@ -138,12 +146,11 @@ const UI = {
     // 6. 카드 교체
     renderCardActions(id, name) {
         return `
-        <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
-            <input type="text" id="new-card-input" placeholder="새 카드 태그" readonly style="width:100%; background:rgba(255,255,255,0.1); color:white; margin-bottom:8px; padding:10px; border-radius:4px; border:1px solid #555;">
-            <button class="btn btn-danger" style="width:100%; padding:10px; background:#f03e3e; border:none; color:white; border-radius:4px; cursor:pointer;" onclick="execCardChange('${id}', '${name}')">이 학생의 카드로 교체</button>
+        <div style="border-top:1px solid var(--border); padding-top:15px; margin-top:15px;">
+            <input type="text" id="new-card-input" placeholder="새 카드를 리더기에 찍으세요" readonly style="text-align:center; border-style:dashed; margin-bottom:10px;">
+            <button class="btn btn-danger" style="background:var(--danger);" onclick="execCardChange('${id}', '${name}')">이 학생의 카드로 정보 교체</button>
         </div>`;
     }
 };
 
-// [중요] app.js에서 접근할 수 있도록 전역 객체로 등록
 window.UI = UI;

@@ -109,17 +109,19 @@ async function findStudent(pageType) {
     const input = document.getElementById(config.inputId);
     if (!input) return;
     const query = input.value.trim();
-    const data = fetchData(query);
-    renderResults(data, pageType);
+    
+    const data = fetchData(query); // fetchData는 이미 배열을 반환합니다.
+    renderResults(data, pageType); 
 }
 
 function findByNfc(id, pageType) {
     const data = fetchData('');
     const found = data.filter(s => String(s.ID) === String(id));
     if (found.length > 0) {
-        renderResults(found, pageType);
+        renderResults(found, pageType); // found 역시 배열입니다.
     } else {
-        alert(`미등록 카드: ${id}`);
+        // [UI 개선] alert 대신 UI 함수 사용 가능
+        renderCheckinUI("미등록", `미등록 카드: ${id}`, "var(--danger)");
     }
 }
 
@@ -223,10 +225,20 @@ async function updatePt(id, amt, event) {
     const res = await callApi({ action: 'updatePoint', id: id, row: student.row, amount: amount }, false);
 
     if (res && res.success) {
-        student.point = res.newTotal;
+        student.point = res.newTotal; // 전역 데이터 업데이트
+        
+        // [UI 최적화] 화면의 포인트 숫자만 즉시 변경
+        // ui.js의 renderSimpleCard 구조에 맞춰 querySelector 활용
+        const cards = document.querySelectorAll('.page');
+        cards.forEach(card => {
+            if(card.innerHTML.includes(student.이름)) { // 이름으로 해당 카드 탐색
+                const ptSpan = card.querySelector('span[style*="var(--accent)"]');
+                if(ptSpan) ptSpan.innerText = `${Number(res.newTotal).toLocaleString()} pt`;
+            }
+        });
+
         if (btn) btn.innerText = "✅";
         setTimeout(() => { if (btn) { btn.innerText = `+${amt}`; btn.disabled = false; } }, 1000);
-        findStudent('point');
     }
 }
 
