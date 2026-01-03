@@ -105,40 +105,36 @@ const UI = {
     renderRegisterForm() {
         window.tempSchedules = []; // 배열 초기화
         return `
-            <div class="form-container">
-                <h2 class="form-section-title">👤 신규 학생 등록</h2>
-                <div class="input-group">
-                    <label class="input-label">카드 ID</label>
-                    <input type="text" id="reg-id" class="modern-input" placeholder="카드를 찍으세요">
-                </div>
-                <div class="input-group">
-                    <label class="input-label">이름</label>
-                    <input type="text" id="reg-name" class="modern-input" placeholder="이름 입력">
-                </div>
-                <div class="input-group">
-                    <label class="input-label">생년월일</label>
-                    <input type="date" id="reg-birth" class="modern-input">
-                </div>
-                <div class="input-group">
-                    <label class="input-label">연락처</label>
-                    <input type="tel" id="reg-phone" class="modern-input" placeholder="010-0000-0000">
-                </div>
-                <div class="input-group">
-                    <label class="input-label">수업 스케줄 설정</label>
-                    <div class="builder-controls">
-                        <select id="reg-day" class="modern-input" style="flex:1;">
-                            <option value="월">월</option><option value="화">화</option><option value="수">수</option>
-                            <option value="목">목</option><option value="금">금</option><option value="토">토</option><option value="일">일</option>
-                        </select>
-                        <input type="time" id="reg-time" class="modern-input" style="flex:1.5;">
-                        <button type="button" onclick="addScheduleTag()" class="btn-build-add">+</button>
-                    </div>
-                    <div id="schedule-tags-container">
-                        <span style="color:var(--muted); font-size:0.8rem;">수업 시간을 추가해주세요.</span>
-                    </div>
-                </div>
-                <button onclick="registerStudent()" class="btn btn-success" style="margin-top:20px;">학생 등록 완료</button>
-            </div>`;
+        <div class="input-group">
+            <label class="input-label">카드 ID</label>
+            <input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>
+        </div>
+        <div class="input-group">
+            <label class="input-label">이름</label>
+            <input type="text" id="field-이름" class="modern-input" placeholder="이름 입력">
+        </div>
+        <div class="input-group">
+            <label class="input-label">생년월일</label>
+            <input type="date" id="field-생년월일" class="modern-input">
+        </div>
+        <div class="input-group">
+            <label class="input-label">연락처</label>
+            <input type="tel" id="field-연락처" class="modern-input" placeholder="010-0000-0000">
+        </div>
+        <div class="input-group">
+            <label class="input-label">수업 스케줄 설정</label>
+            <div class="builder-controls" style="display:flex; gap:5px;">
+                <select id="reg-day" class="modern-input" style="flex:1;">
+                    <option value="월">월</option><option value="화">화</option><option value="수">수</option>
+                    <option value="목">목</option><option value="금">금</option><option value="토">토</option><option value="일">일</option>
+                </select>
+                <input type="time" id="reg-time" class="modern-input" style="flex:1.5;">
+                <button type="button" onclick="addScheduleTag()" class="btn btn-primary" style="padding:0 15px;">+</button>
+            </div>
+            <div id="schedule-tags-container" style="margin-top:10px;">
+                <span style="color:var(--muted); font-size:0.8rem;">수업 시간을 추가해주세요.</span>
+            </div>
+        </div>`;
     },
 
     // 5. 출석 현황판 (기존 생일 학생 강조 기능 유지)
