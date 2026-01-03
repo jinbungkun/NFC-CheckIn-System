@@ -406,15 +406,20 @@ function showPage(p) {
     });
 
     if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
-    if (p === 'add') refreshSchema(false);
-    if (p === 'schedule') updateScheduleDashboard();
-    if (p === 'register-page') {
+    
+    // [수정 포인트] p가 'add'일 때 새로운 등록 폼을 그리도록 통합
+    if (p === 'add') {
         const container = document.getElementById('register-page-container');
         if (container) {
+            // UI.js의 새 등록 폼 렌더링
             container.innerHTML = UI.renderRegisterForm(); 
-            // 호출 시 window.tempSchedules = [] 로 초기화됨
+        } else {
+            // 만약 container가 없다면 기존 방식(refreshSchema)으로 작동하도록 백업
+            refreshSchema(false);
         }
     }
+
+    if (p === 'schedule') updateScheduleDashboard();
 
     isUserTyping = false;
     updateFocusUI();
