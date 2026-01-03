@@ -478,22 +478,16 @@ async function refreshSchema(force = false) {
 }
 
 function renderAddFields() {
-    const container = document.getElementById('dynamic-add-fields');
+    // 1. UI를 그릴 컨테이너 확인 (HTML에 있는 ID)
+    const container = document.getElementById('register-page-container') || document.getElementById('dynamic-add-fields');
+    
     if (!container) return;
-    container.innerHTML = "";
-    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
-    currentHeaders.forEach(header => {
-        if (skipHeaders.includes(header)) return;
-        const label = document.createElement('label'); label.innerText = header; label.className = "field-label";
-        container.appendChild(label);
-        const input = document.createElement('input');
-        if (header === 'ID') {
-            input.id = PAGE_CONFIG.register.inputId; input.readOnly = true; input.placeholder = "카드를 태그하세요";
-        } else {
-            input.id = `field-${header}`; input.placeholder = `${header} 입력`;
-        }
-        container.appendChild(input);
-    });
+
+    // 2. ui.js에서 작성한 헤더 매핑 로직(스케줄 빌더 포함)을 호출
+    // 이 함수가 currentHeaders를 읽어서 스케줄 빌더까지 포함한 HTML을 반환합니다.
+    container.innerHTML = UI.renderRegisterForm();
+    
+    console.log("등록 필드가 시트 헤더에 맞춰 갱신되었습니다.");
 }
 
 /* ==========================================================================

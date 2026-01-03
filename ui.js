@@ -103,39 +103,46 @@ const UI = {
 
     // 4. [신규 통합] 학생 등록 폼 (스케줄 빌더 포함)
     renderRegisterForm() {
-        window.tempSchedules = []; // 배열 초기화
-        return `
-        <div class="input-group">
-            <label class="input-label">카드 ID</label>
-            <input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>
-        </div>
-        <div class="input-group">
-            <label class="input-label">이름</label>
-            <input type="text" id="field-이름" class="modern-input" placeholder="이름 입력">
-        </div>
-        <div class="input-group">
-            <label class="input-label">생년월일</label>
-            <input type="date" id="field-생년월일" class="modern-input">
-        </div>
-        <div class="input-group">
-            <label class="input-label">연락처</label>
-            <input type="tel" id="field-연락처" class="modern-input" placeholder="010-0000-0000">
-        </div>
-        <div class="input-group">
-            <label class="input-label">수업 스케줄 설정</label>
-            <div class="builder-controls" style="display:flex; gap:5px;">
-                <select id="reg-day" class="modern-input" style="flex:1;">
-                    <option value="월">월</option><option value="화">화</option><option value="수">수</option>
-                    <option value="목">목</option><option value="금">금</option><option value="토">토</option><option value="일">일</option>
-                </select>
-                <input type="time" id="reg-time" class="modern-input" style="flex:1.5;">
-                <button type="button" onclick="addScheduleTag()" class="btn btn-primary" style="padding:0 15px;">+</button>
-            </div>
-            <div id="schedule-tags-container" style="margin-top:10px;">
-                <span style="color:var(--muted); font-size:0.8rem;">수업 시간을 추가해주세요.</span>
-            </div>
-        </div>`;
-    },
+    window.tempSchedules = []; // 초기화
+    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
+    let html = '';
+
+    // app.js에 저장된 currentHeaders를 순회
+    currentHeaders.forEach(header => {
+        if (skipHeaders.includes(header)) return;
+
+        html += `<div class="input-group">
+                    <label class="input-label">${header}</label>`;
+
+        if (header === 'ID') {
+            html += `<input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>`;
+        } 
+        else if (header === '수업스케줄') {
+            // 수업스케줄 헤더일 때만 빌더 노출
+            html += `
+                <div class="builder-controls" style="display:flex; gap:5px;">
+                    <select id="reg-day" class="modern-input" style="flex:1;">
+                        <option value="월">월</option><option value="화">화</option><option value="수">수</option>
+                        <option value="목">목</option><option value="금">금</option><option value="토">토</option><option value="일">일</option>
+                    </select>
+                    <input type="time" id="reg-time" class="modern-input" style="flex:1.5;">
+                    <button type="button" onclick="addScheduleTag()" class="btn btn-primary" style="padding:0 15px;">+</button>
+                </div>
+                <div id="schedule-tags-container" style="margin-top:10px; border:1px dashed #ccc; padding:10px; border-radius:8px;">
+                    <span style="color:var(--muted); font-size:0.8rem;">수업 시간을 추가해주세요.</span>
+                </div>`;
+        } 
+        else {
+            // 그 외 모든 커스텀 헤더 (이름, 학교, 연락처 등)
+            // input id를 field-헤더명 으로 설정하여 app.js의 registerStudent와 매칭
+            html += `<input type="text" id="field-${header}" class="modern-input" placeholder="${header} 입력">`;
+        }
+        
+        html += `</div>`;
+    });
+
+    return html;
+},
 
     // 5. 출석 현황판 (기존 생일 학생 강조 기능 유지)
     renderScheduleBoard(groupedData, summary) {
