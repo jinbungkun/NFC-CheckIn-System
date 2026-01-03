@@ -151,7 +151,7 @@ renderCheckinUI(name, msg, color, point) {
         const studentCards = groupedData[time].map(s => `
             <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'}">
                 <div class="name">${s.name}</div>
-                <div class="status-indicator">${s.isPresent ? '출석완료' : '결석'}</div>
+                <div class="status-indicator">${s.isPresent ? '출석완료' : '미출석'}</div>
             </div>
         `).join('');
 
