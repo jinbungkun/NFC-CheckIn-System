@@ -138,31 +138,30 @@ async function doCheckin() {
     const student = quickMap[id];
     const today = new Date().toLocaleDateString('sv-SE');
 
-    // 1. 이미 출석한 경우: 현재 보유 포인트 표시 (수정됨)
+    // 1. 이미 출석한 경우
     if (student && student.lastDate === today) {
-        // quickMap에 저장된 현재 포인트를 그대로 가져와서 표시
+        // [중요] 4번째 인자로 student.point를 보냅니다.
         renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)", student.point);
         return;
     }
 
-    // 2. 등록된 학생이 처음 출석하는 경우
+    // 2. 처음 출석하는 경우
     if (student) {
-        // 포인트 추가(+10) 없이 현재 포인트 그대로 표시
+        // 여기도 4번째 인자로 현재 포인트를 보냅니다.
         renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)", student.point);
         
         student.lastDate = today;
-
         callApi({ action: 'checkin', id: id, row: student.row }, false).then(res => {
             if (!res || !res.success) {
                 renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
             }
         });
     } 
-    // 3. 미등록 카드이거나 신규 학생인 경우
+    // 3. 신규 또는 미등록
     else {
         const res = await callApi({ action: 'checkin', id: id }, true);
         if (res && res.success) {
-            // 서버에서 응답받은 포인트 표시
+            // 서버에서 응답받은 포인트(res.point)를 보냅니다.
             renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point);
             await initQuickMap();
         } else {
@@ -170,6 +169,7 @@ async function doCheckin() {
         }
     }
 }
+
 async function doManualCheckin(id) {
     const student = quickMap[id];
     if (!student) return;
