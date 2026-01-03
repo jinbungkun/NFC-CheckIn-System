@@ -41,8 +41,7 @@ const UI = {
                             <div class="info-item">📱 ${s.전화번호 || '-'}</div>
                             <div class="info-item">💰 <span class="point-val" style="color:var(--accent); font-weight:bold;">${s.포인트} pt</span></div>
                             <div class="info-item" style="grid-column: span 2;">📅 수업: ${s.수업스케줄 || '정보 없음'}</div>
-                        </div>
-                        <button class="btn-manual-checkin" onclick="doManualCheckin('${s.ID}')" style="width:100%; margin-top:15px; padding:10px; border-radius:8px; border:none; background:var(--primary); color:white; font-weight:bold; cursor:pointer;">수동 출석 처리</button>
+                        </div
                     </div>
                     <div class="dash-calendar" style="margin-top:20px; border-top: 1px solid #444; padding-top:20px;">
                         <div class="cal-nav" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">

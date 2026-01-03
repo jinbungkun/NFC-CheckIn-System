@@ -7,6 +7,7 @@
   --muted: #94a3b8; 
   --accent: #f59e0b; 
   --danger: #ef4444; 
+  --border: #334155;
 }
 
 body { 
@@ -16,67 +17,69 @@ body {
   margin: 0; 
   padding: 15px; 
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* 1. 헤더 및 상단 상태바 */
+/* 1. 상단 상태바 & 헤더 */
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-#mode-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: var(--card); color: var(--muted); font-weight: bold; }
-#mode-status.admin-active { background: #7f1d1d; color: #fecaca; }
+#mode-status { font-size: 0.8rem; padding: 6px 14px; border-radius: 20px; background: var(--card); color: var(--muted); font-weight: bold; border: 1px solid var(--border); }
+#mode-status.admin-active { background: #7f1d1d; color: #fecaca; border-color: #ef4444; }
 #focus-indicator { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; background: var(--card); color: var(--muted); }
 
 /* 2. 네비게이션 */
-.nav { display: flex; gap: 8px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 16px; overflow-x: auto; }
-.nav button { flex: 1; min-width: 70px; background: transparent; color: var(--muted); border: none; padding: 12px 0; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.2s; }
-.nav button.active { background: var(--primary); color: white; }
+.nav { display: flex; gap: 8px; margin-bottom: 20px; background: var(--card); padding: 8px; border-radius: 16px; overflow-x: auto; border: 1px solid var(--border); }
+.nav button { flex: 1; min-width: 80px; background: transparent; color: var(--muted); border: none; padding: 12px 5px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.3s ease; white-space: nowrap; }
+.nav button.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
 
 /* 3. 페이지 공통 */
-.page { display: none; background: var(--card); padding: 25px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-.page.active { display: block !important; }
-h2 { margin-top: 0; font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+.page { display: none; background: var(--card); padding: 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: 1px solid var(--border); }
+.page.active { display: block !important; animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* 4. 입력창 및 버튼 */
-input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #334155; background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; }
+/* 4. 입력창 및 공통 버튼 */
+input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: white; font-size: 1rem; box-sizing: border-box; transition: 0.2s; }
 input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
-.btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; }
-.btn-primary { background: var(--primary); color: white; }
-.btn-success { background: var(--success); color: white; }
-.btn:active { transform: scale(0.98); opacity: 0.9; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
 
-/* 5. 정보 조회 대시보드 */
+.btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s ease; }
+.btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2); }
+.btn-success { background: var(--success); color: white; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2); }
+.btn:active { transform: scale(0.97); opacity: 0.9; }
+
+/* 5. 학생 조회 대시보드 카드 */
 .student-dashboard-card {
-  display: flex;
-  flex-wrap: wrap;
-  background: rgba(255,255,255,0.03);
-  border-radius: 20px;
-  margin-top: 20px;
-  border: 1px solid #334155;
-  overflow: hidden;
+  display: flex; flex-wrap: wrap; background: rgba(255,255,255,0.02);
+  border-radius: 24px; margin-top: 20px; border: 1px solid var(--border); overflow: hidden;
 }
-.dash-info { flex: 1; padding: 20px; border-right: 1px solid #334155; min-width: 250px; }
-.dash-calendar { flex: 1.5; padding: 20px; background: rgba(0,0,0,0.2); min-width: 300px; }
-.student-name { font-size: 1.4rem; font-weight: bold; color: var(--accent); display: block; margin-bottom: 10px; }
-.info-item { font-size: 0.9rem; color: var(--muted); margin: 6px 0; display: flex; align-items: center; gap: 6px; }
+.dash-info { flex: 1; padding: 25px; border-right: 1px solid var(--border); min-width: 250px; }
+.dash-calendar { flex: 1.5; padding: 25px; background: rgba(0,0,0,0.15); min-width: 300px; }
+
+.student-name { font-size: 1.6rem; font-weight: 800; color: var(--accent); display: block; margin-bottom: 12px; }
+.info-item { font-size: 0.95rem; color: var(--muted); margin: 8px 0; display: flex; align-items: center; gap: 8px; }
+.info-value { color: var(--text); font-weight: 500; }
 
 /* 6. 📅 달력 스타일 */
 .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.cal-label { font-weight: bold; color: var(--text); }
-.cal-btn { background: #334155; color: white; border: none; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
-.day-header { font-size: 0.7rem; color: #64748b; font-weight: bold; padding: 5px 0; }
-.day-num { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--muted); background: rgba(255,255,255,0.05); border-radius: 8px; transition: 0.3s; }
+.cal-label { font-size: 1.1rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+.cal-btn { background: #334155; color: white; border: none; padding: 6px 14px; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+.cal-btn:hover { background: var(--primary); }
 
-/* 🌟 출석 관련 핵심 스타일 (중복 병합 및 강화) */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+.day-header { font-size: 0.75rem; color: #64748b; font-weight: 800; padding: 5px 0; }
+.day-num { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; color: var(--muted); background: rgba(255,255,255,0.03); border-radius: 10px; transition: 0.2s ease; cursor: default; }
+
+/* 🌟 출석 성공 스타일 (깔끔한 사각형 배경) */
 .day-num.is-present {
-    background-color: var(--success) !important; 
-    color: white !important;
-    border-radius: 50%; 
+    background-color: var(--success) !important; /* 초록색 배경 */
+    color: white !important;                    /* 글자색 흰색 */
     font-weight: bold;
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    border-radius: 8px;                         /* 다른 칸들과 동일한 곡률 */
 }
 
-.day-num.is-today {
-    border: 2px solid var(--primary);
-    color: var(--primary);
+/* 오늘이면서 출석한 경우 */
+.day-num.is-today.is-present {
+    border: 2px solid white;                    /* 오늘임을 알리는 테두리만 유지 */
+    background-color: var(--success) !important;
 }
 
 /* 오늘이면서 출석한 경우 */
@@ -84,20 +87,12 @@ input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px
     border: 2px solid white;
 }
 
-/* 7. 스케줄 보드 스타일 */
-.status-summary { display: flex; gap: 10px; margin-bottom: 20px; }
-.summary-item { flex: 1; text-align: center; padding: 10px; border-radius: 12px; font-size: 0.9rem; }
-
-.status-card { transition: 0.2s; }
-.status-card.present { border-left: 5px solid var(--success); background: rgba(16, 185, 129, 0.1); }
-.status-card.absent { border-left: 5px solid var(--danger); background: rgba(239, 68, 68, 0.1); opacity: 0.8; }
-
-/* 8. 기타 */
-.student-info-card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px; margin-top: 15px; border: 1px solid #334155; }
-#loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
-
-/* 9. 모바일 대응 */
-@media (max-width: 600px) {
-  .dash-info { border-right: none; border-bottom: 1px solid #334155; }
-  .nav button { width: auto; padding: 12px 15px; }
+/* 7. 모바일 최적화 */
+@media (max-width: 650px) {
+  .student-dashboard-card { flex-direction: column; }
+  .dash-info { border-right: none; border-bottom: 1px solid var(--border); }
+  .nav button { padding: 12px 10px; font-size: 0.8rem; }
+  .page { padding: 18px; }
 }
+
+#loader { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.85); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
