@@ -3,7 +3,7 @@
    ========================================================================== */
 
 let checkinTimer = null;
-
+window.tempSchedules = [];
 const UI = {
     // 1. 체크인 결과 표시 (성공/실패 피드백)
 renderCheckinUI(name, msg, color, point) {
