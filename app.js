@@ -11,7 +11,6 @@ const PAGE_CONFIG = {
     schedule: { inputId: 'page-schedule-status' }
 };
 
-let isMouseDown = false;
 let isAdmin = false;
 let isUserTyping = false;
 let isApiLoading = false;
@@ -500,56 +499,41 @@ function updateFocusUI() {
 }
 
 function focusNfc() {
-    // 1. 최소한의 방어막: API 로딩 중이거나 마우스를 누르고 있을 때만 중단
-    if (isApiLoading || isMouseDown) return;
+    // API 로딩 중이거나 사용자가 다른 입력창을 쓰고 있다면 포커스 뺏지 않음
+    if (isUserTyping || isApiLoading) return;
     
-    const el = document.activeElement;
-
-    // 2. 사용자가 '진짜로' 입력 도구를 쓰고 있다면 보호
-    // SELECT 박스가 열려있거나, 시간/날짜 선택 중일 때만 리더기 복구 중단
-    if (el.tagName === 'SELECT' || el.type === 'time' || el.type === 'date') return;
-
-    // 3. 리더기 포커스 복구 (핵심 수정)
-    // 현재 포커스가 일반 텍스트 입력창(ID, 이름 등)이 아닐 때만 복구
-    if (el.id !== 'nfc-bridge' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') {
-        if (nfcBridge) {
-            nfcBridge.focus({ preventScroll: true });
-            isUserTyping = false; // 포커스가 돌아오면 타이핑 모드 강제 해제
-            updateFocusUI();
-        }
+    // 현재 포커스된 요소가 input이 아니면 nfc-bridge로 포커스 이동
+    if (document.activeElement.tagName !== 'INPUT') {
+        if (nfcBridge) nfcBridge.focus({ preventScroll: true });
     }
 }
 
 function initFocusGuard() {
-    // [기존 포커스 감지 로직]
+    // 모든 입력창에 포커스 이벤트 감지 (NFC 입력 방해 금지)
     document.addEventListener('focusin', (e) => {
         if (e.target.id !== 'nfc-bridge') {
             isUserTyping = true;
             updateFocusUI();
         }
     });
-
     document.addEventListener('focusout', (e) => {
-        if (e.target.id === 'nfc-bridge') return;
-        setTimeout(focusNfc, 500);
-    });
-
-    // [마우스/드래그 보호 로직]
-    document.addEventListener('mousedown', () => { isMouseDown = true; });
-    document.addEventListener('mouseup', () => { 
-        isMouseDown = false; 
-        // 마우스를 떼면 무조건 리더기 상태를 한 번 점검하여 깨움
-        setTimeout(focusNfc, 300); 
-    });
-
-    // [추가] 바탕화면 클릭 시 즉시 리더기 복구
-    document.body.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BODY' || e.target.classList.contains('page')) {
-            isUserTyping = false;
-            focusNfc();
+        if (e.target.id !== 'nfc-bridge') {
+            setTimeout(() => {
+                isUserTyping = false;
+                updateFocusUI();
+                focusNfc();
+            }, 500);
         }
     });
 }
+
+nfcBridge.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const val = nfcBridge.value.trim();
+        if (val) processNfc(val);
+        nfcBridge.value = "";
+    }
+});
 
 function processNfc(val) {
     const activePage = document.querySelector('.page.active');
