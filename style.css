@@ -191,17 +191,30 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 
 /* --- ✨ 화려한 생일 학생 카드 스타일 (왼쪽 배치 버전) --- */
 .student-status-card.is-birthday {
-    position: relative;
-    padding-left: 45px !important; /* 왼쪽에 뱃지가 들어갈 공간 */
-    border: 2px solid transparent !important;
-    /* 무지개빛 테두리 효과 */
-    background-image: linear-gradient(var(--card), var(--card)), 
-                      linear-gradient(45deg, #ff9a9e, #fad0c4, #ffd1ff, #3b82f6);
-    background-origin: border-box;
-    background-clip: content-box, border-box;
+    position: relative !important;
+    padding-left: 45px !important;
+    border: none !important; /* 이름 뒤 배경을 만드는 주범인 테두리 기법 제거 */
+    
+    /* 카드 전체에 그라데이션 적용 */
+    background: linear-gradient(45deg, #ff9a9e, #fad0c4, #ffd1ff, #3b82f6) !important;
+    background-size: 200% 200% !important;
+    
     overflow: visible !important;
-    box-shadow: 0 0 15px rgba(255, 182, 193, 0.4);
-    animation: celebrate-border 3s linear infinite;
+    box-shadow: 0 4px 15px rgba(255, 182, 193, 0.5) !important;
+    animation: celebrate-gradient 3s ease infinite !important;
+}
+
+/* 생일 카드 안의 텍스트 가독성 (어두운 배경이 없으므로 그림자 추가) */
+.student-status-card.is-birthday .name {
+    color: white !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    font-weight: 800;
+}
+
+.student-status-card.is-birthday .status-indicator {
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    opacity: 0.9;
 }
 
 /* 생일이면서 출석까지 했을 때: 하단에 초록색 강조선 추가 */
