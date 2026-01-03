@@ -110,16 +110,16 @@ renderCheckinUI(name, msg, color, point) {
     },
 
     // 4. 출석 현황판 (스케줄 대시보드)
-  renderScheduleBoard(groupedData, summary) {
+ renderScheduleBoard(groupedData, summary) {
     const board = document.getElementById('schedule-board'); 
     const summaryDiv = document.getElementById('schedule-summary');
     if (!board || !summaryDiv) return;
 
-    // [추가] 오늘 날짜 추출 (MM-DD 형식으로 비교하기 위함)
+    // [핵심] 오늘 날짜 추출 (MM-DD 형식)
     const now = new Date();
     const todayMMDD = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    // 상단 요약 바 디자인 개선
+    // 상단 요약 바
     summaryDiv.innerHTML = `
         <div class="summary-card total">
             <span class="label">대상</span>
@@ -153,8 +153,8 @@ renderCheckinUI(name, msg, color, point) {
         
         // 학생 카드 생성
         const studentCards = groupedData[time].map(s => {
-            // [추가] 생일 체크 로직 (데이터의 생일 문자열에 오늘 날짜가 포함되는지 확인)
-            const isBirthday = s.phone && s.birth && s.birth.includes(todayMMDD);
+            // [체크] s.birth에 오늘 날짜(MM-DD)가 포함되어 있는지 확인
+            const isBirthday = s.birth && s.birth.includes(todayMMDD);
             
             return `
                 <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'} ${isBirthday ? 'is-birthday' : ''}">

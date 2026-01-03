@@ -190,13 +190,23 @@ function updateScheduleDashboard() {
         if (classTime !== "수업없음") {
             const isPresent = (student.lastDate === today);
             if (!grouped[classTime]) grouped[classTime] = [];
-            grouped[classTime].push({ name: student.name, isPresent: isPresent, phone: student.phone || "" });
+            
+            // UI로 보낼 데이터 묶음에 birth(생일) 정보를 추가합니다.
+            grouped[classTime].push({ 
+                name: student.name, 
+                isPresent: isPresent, 
+                phone: student.phone || "",
+                birth: student.birth || "" // 👈 이 부분이 추가되었습니다.
+            });
+            
             summary.total++;
             isPresent ? summary.present++ : summary.absent++;
         }
     });
 
-    if (window.UI && UI.renderScheduleBoard) UI.renderScheduleBoard(grouped, summary);
+    if (window.UI && UI.renderScheduleBoard) {
+        UI.renderScheduleBoard(grouped, summary);
+    }
 }
 
 /* ==========================================================================
