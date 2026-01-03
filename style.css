@@ -204,6 +204,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
     animation: celebrate-gradient 3s ease infinite !important;
 }
 
+.student-status-card.is-birthday::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.1); /* 미세하게 어두운 막을 씌워 글씨 강조 */
+    border-radius: 12px;
+    z-index: 1; /* 글자보다는 뒤에, 배경보다는 위에 위치 */
+}
+
 /* 생일 카드 안의 텍스트 가독성 (어두운 배경이 없으므로 그림자 추가) */
 .student-status-card.is-birthday .name {
     color: white !important;
