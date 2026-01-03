@@ -11,6 +11,7 @@ const PAGE_CONFIG = {
     schedule: { inputId: 'page-schedule-status' }
 };
 
+let isMouseDown = false;
 let isAdmin = false;
 let isUserTyping = false;
 let isApiLoading = false;
@@ -499,41 +500,54 @@ function updateFocusUI() {
 }
 
 function focusNfc() {
-    // API 로딩 중이거나 사용자가 다른 입력창을 쓰고 있다면 포커스 뺏지 않음
-    if (isUserTyping || isApiLoading) return;
+    // 1. API 로딩, 타이핑 중, 혹은 [마우스 클릭/드래그 중]이면 중단
+    if (isUserTyping || isApiLoading || isMouseDown) return;
     
-    // 현재 포커스된 요소가 input이 아니면 nfc-bridge로 포커스 이동
-    if (document.activeElement.tagName !== 'INPUT') {
+    const el = document.activeElement;
+    
+    // 2. 선택창이나 시간 입력창 보호
+    if (el.tagName === 'SELECT' || el.type === 'time' || el.type === 'date') return;
+
+    // 3. 현재 포커스가 일반 입력창이 아닐 때만 리더기로 포커스 이동
+    if (el.tagName !== 'INPUT') {
         if (nfcBridge) nfcBridge.focus({ preventScroll: true });
     }
 }
 
 function initFocusGuard() {
-    // 모든 입력창에 포커스 이벤트 감지 (NFC 입력 방해 금지)
+    // 1. 모든 입력창 포커스 감지
     document.addEventListener('focusin', (e) => {
         if (e.target.id !== 'nfc-bridge') {
             isUserTyping = true;
             updateFocusUI();
         }
     });
+
     document.addEventListener('focusout', (e) => {
         if (e.target.id !== 'nfc-bridge') {
             setTimeout(() => {
-                isUserTyping = false;
-                updateFocusUI();
-                focusNfc();
+                // 현재 포커스된 곳이 여전히 입력창(또는 선택창)이 아닐 때만 Typing 해제
+                const el = document.activeElement;
+                if (el.tagName !== 'INPUT' && el.tagName !== 'SELECT') {
+                    isUserTyping = false;
+                    updateFocusUI();
+                    focusNfc();
+                }
             }, 500);
         }
     });
-}
 
-nfcBridge.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        const val = nfcBridge.value.trim();
-        if (val) processNfc(val);
-        nfcBridge.value = "";
-    }
-});
+    // 2. [신규] 마우스 드래그 및 복사 작업 보호
+    document.addEventListener('mousedown', () => { 
+        isMouseDown = true; 
+    });
+
+    document.addEventListener('mouseup', () => { 
+        isMouseDown = false; 
+        // 드래그가 끝난 후 사용자가 복사(Ctrl+C)나 우클릭을 할 여유 시간을 줌
+        setTimeout(focusNfc, 800); 
+    });
+}
 
 function processNfc(val) {
     const activePage = document.querySelector('.page.active');
