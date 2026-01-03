@@ -500,22 +500,28 @@ function updateFocusUI() {
 }
 
 function focusNfc() {
-    // 1. API 로딩, 타이핑 중, 혹은 [마우스 클릭/드래그 중]이면 중단
-    if (isUserTyping || isApiLoading || isMouseDown) return;
+    // 1. 최소한의 방어막: API 로딩 중이거나 마우스를 누르고 있을 때만 중단
+    if (isApiLoading || isMouseDown) return;
     
     const el = document.activeElement;
-    
-    // 2. 선택창이나 시간 입력창 보호
+
+    // 2. 사용자가 '진짜로' 입력 도구를 쓰고 있다면 보호
+    // SELECT 박스가 열려있거나, 시간/날짜 선택 중일 때만 리더기 복구 중단
     if (el.tagName === 'SELECT' || el.type === 'time' || el.type === 'date') return;
 
-    // 3. 현재 포커스가 일반 입력창이 아닐 때만 리더기로 포커스 이동
-    if (el.tagName !== 'INPUT') {
-        if (nfcBridge) nfcBridge.focus({ preventScroll: true });
+    // 3. 리더기 포커스 복구 (핵심 수정)
+    // 현재 포커스가 일반 텍스트 입력창(ID, 이름 등)이 아닐 때만 복구
+    if (el.id !== 'nfc-bridge' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') {
+        if (nfcBridge) {
+            nfcBridge.focus({ preventScroll: true });
+            isUserTyping = false; // 포커스가 돌아오면 타이핑 모드 강제 해제
+            updateFocusUI();
+        }
     }
 }
 
 function initFocusGuard() {
-    // 1. 모든 입력창 포커스 감지
+    // [기존 포커스 감지 로직]
     document.addEventListener('focusin', (e) => {
         if (e.target.id !== 'nfc-bridge') {
             isUserTyping = true;
@@ -524,28 +530,24 @@ function initFocusGuard() {
     });
 
     document.addEventListener('focusout', (e) => {
-        if (e.target.id !== 'nfc-bridge') {
-            setTimeout(() => {
-                // 현재 포커스된 곳이 여전히 입력창(또는 선택창)이 아닐 때만 Typing 해제
-                const el = document.activeElement;
-                if (el.tagName !== 'INPUT' && el.tagName !== 'SELECT') {
-                    isUserTyping = false;
-                    updateFocusUI();
-                    focusNfc();
-                }
-            }, 500);
-        }
+        if (e.target.id === 'nfc-bridge') return;
+        setTimeout(focusNfc, 500);
     });
 
-    // 2. [신규] 마우스 드래그 및 복사 작업 보호
-    document.addEventListener('mousedown', () => { 
-        isMouseDown = true; 
-    });
-
+    // [마우스/드래그 보호 로직]
+    document.addEventListener('mousedown', () => { isMouseDown = true; });
     document.addEventListener('mouseup', () => { 
         isMouseDown = false; 
-        // 드래그가 끝난 후 사용자가 복사(Ctrl+C)나 우클릭을 할 여유 시간을 줌
-        setTimeout(focusNfc, 800); 
+        // 마우스를 떼면 무조건 리더기 상태를 한 번 점검하여 깨움
+        setTimeout(focusNfc, 300); 
+    });
+
+    // [추가] 바탕화면 클릭 시 즉시 리더기 복구
+    document.body.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BODY' || e.target.classList.contains('page')) {
+            isUserTyping = false;
+            focusNfc();
+        }
     });
 }
 
