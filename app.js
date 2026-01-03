@@ -251,20 +251,34 @@ async function registerStudent() {
     const fields = {};
     const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
 
+    // 1. 기존 방식대로 시트 헤더를 순회하며 입력값 수집
     currentHeaders.forEach(h => {
         if (!skipHeaders.includes(h)) {
-            const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
-            if (el) fields[h] = el.value.trim();
+            // 수업스케줄 필드인 경우: 빌더에서 만든 태그 데이터를 합쳐서 넣음
+            if (h === '수업스케줄') {
+                fields[h] = window.tempSchedules.join(', ');
+            } 
+            // 그 외 필드(ID, 이름, 연락처 등): 기존처럼 input 엘리먼트에서 가져옴
+            else {
+                const el = document.getElementById(h === 'ID' ? PAGE_CONFIG.register.inputId : `field-${h}`);
+                if (el) fields[h] = el.value.trim();
+            }
         }
     });
 
+    // 2. 필수 값 체크 (기존 유지)
     if (!fields['ID'] || !fields['이름']) return alert("ID와 이름은 필수입니다.");
+    
+    // 스케줄 입력 여부 추가 체크 (선택 사항)
+    if (!fields['수업스케줄']) return alert("수업 스케줄을 최소 하나 추가해주세요.");
 
+    // 3. API 호출 (기존 전송 방식 'add' 유지)
     const res = await callApi({ action: 'add', fields: fields }, true);
+    
     if (res && res.success) {
         alert("등록 완료!");
-        await initQuickMap();
-        showPage('checkin');
+        if (typeof initQuickMap === 'function') await initQuickMap();
+        showPage('checkin'); // 혹은 'attendance-page'
     }
 }
 
@@ -394,6 +408,13 @@ function showPage(p) {
     if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
     if (p === 'add') refreshSchema(false);
     if (p === 'schedule') updateScheduleDashboard();
+    if (p === 'register-page') {
+        const container = document.getElementById('register-page-container');
+        if (container) {
+            container.innerHTML = UI.renderRegisterForm(); 
+            // 호출 시 window.tempSchedules = [] 로 초기화됨
+        }
+    }
 
     isUserTyping = false;
     updateFocusUI();
