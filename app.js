@@ -400,37 +400,32 @@ function showPage(p) {
 
     document.querySelectorAll('.nav button').forEach(btn => { btn.classList.toggle('active', btn.id === 'nav-' + p); });
     
-    // 입력창 초기화 (설정 페이지 제외)
+    // 입력창 초기화
     document.querySelectorAll('input').forEach(input => {
         if (!['nfc-bridge', 'cfg-url'].includes(input.id) && input.type !== 'button') input.value = "";
     });
 
     if (p === 'settings') document.getElementById('cfg-url').value = localStorage.getItem('GAS_URL') || "";
     
-    // [수정 포인트] p가 'add'일 때 새로운 등록 폼을 그리도록 통합
     if (p === 'add') {
         const container = document.getElementById('register-page-container');
         if (container) {
-            // UI.js의 새 등록 폼 렌더링
             container.innerHTML = UI.renderRegisterForm(); 
         } else {
-            // 만약 container가 없다면 기존 방식(refreshSchema)으로 작동하도록 백업
             refreshSchema(false);
         }
     }
 
     if (p === 'schedule') updateScheduleDashboard();
 
+    // [핵심 수정] 페이지 전환 시 무조건 Typing 상태를 끄고 리더기로 포커스 통일
     isUserTyping = false;
     updateFocusUI();
     
-    // 페이지 전환 후 포커스 타겟 설정
-    if (PAGE_CONFIG[p] && PAGE_CONFIG[p].inputId) {
-        const inputEl = document.getElementById(PAGE_CONFIG[p].inputId);
-        if(inputEl) setTimeout(() => inputEl.focus(), 200);
-    } else {
-        setTimeout(focusNfc, 300);
-    }
+    // PC/모바일 공통: 
+    // 페이지 이동 시 특정 입력창(ID, 이름 등)에 포커스를 주지 않습니다.
+    // 대신 백그라운드 리더기(nfc-bridge)에만 포커스를 맞춰 카드를 찍을 준비만 합니다.
+    setTimeout(focusNfc, 300);
 }
 
 function toggleAdmin() {
