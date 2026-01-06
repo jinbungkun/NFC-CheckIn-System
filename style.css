@@ -165,3 +165,18 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
   .student-dashboard-card { flex-direction: column; }
   .dash-info { border-right: none; border-bottom: 1px solid var(--border); }
 }
+
+.admin-lock-btn {
+    background: transparent !important; /* 배경 투명 */
+    border: none !important;             /* 테두리 제거 */
+    padding: 0;                          /* 여백 제거 */
+    cursor: pointer;                     /* 마우스 올리면 손가락 모양 */
+    font-size: 1.2rem;                   /* 아이콘 크기 조절 */
+    outline: none !important;            /* 클릭 시 테두리 제거 */
+    box-shadow: none !important;         /* 그림자 제거 */
+}
+
+/* 마우스를 올렸을 때 살짝 투명하게 효과 (선택사항) */
+.admin-lock-btn:hover {
+    opacity: 0.7;
+}
