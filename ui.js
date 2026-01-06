@@ -85,12 +85,15 @@ const UI = {
     },
 
     // 3. 심플 카드 (포인트/카드 교체용)
-    renderSimpleCard(s, type) {
-        const actionHtml = type === 'point' ? this.renderPointActions(s.ID) : this.renderCardActions(s.ID, s.이름);
+   renderSimpleCard(s, type) {
+        const actionHtml = type === 'point' ? this.renderPointActions(s) : this.renderCardActions(s.ID, s.이름);
         return `
-            <div class="student-simple-card" style="background:white; border:1px solid var(--border); border-radius:12px; padding:15px; margin-bottom:10px; box-shadow:var(--shadow-sm);">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <strong>${s.이름}</strong>
+            <div class="student-simple-card" style="background:white; border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:12px; box-shadow:var(--shadow-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                        <strong style="font-size:1.1rem; color:#333;">${s.이름}</strong>
+                        <span style="font-size:0.9rem; color:var(--accent); font-weight:bold; margin-left:8px;">${Number(s.포인트).toLocaleString()} pt</span>
+                    </div>
                     <span style="font-size:0.85rem; color:var(--muted);">${s.전화번호 || ''}</span>
                 </div>
                 ${actionHtml}
@@ -188,10 +191,23 @@ const UI = {
     },
 
     // 6. 포인트/7. 카드교체 액션 (기존 유지)
-    renderPointActions(id) {
-        return `<div style="margin-top:10px; display:flex; gap:5px;">
-            <input type="number" id="pt-inp-${id}" placeholder="포인트" style="flex:1; margin:0;">
-            <button class="btn btn-primary" onclick="updatePtManual('${id}', event)">지급</button>
+  renderPointActions(s) {
+        return `
+        <div style="border-top:1px solid #f0f0f0; padding-top:12px; margin-top:5px;">
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:10px;">
+                ${[10, 50, 100].map(v => `
+                    <button class="btn" 
+                            style="background:#f0f7ff; color:#007bff; border:1px solid #d0e5ff; padding:8px 0; border-radius:8px; font-weight:bold; font-size:0.85rem; cursor:pointer;"
+                            onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>
+                `).join('')}
+            </div>
+            <div style="display:flex; gap:6px;">
+                <input type="number" id="pt-inp-${s.ID}" placeholder="직접 입력" 
+                       style="flex:1; margin:0; padding:10px; border:1.5px solid #eee; border-radius:8px; font-size:0.9rem;">
+                <button class="btn btn-primary" 
+                        style="padding:0 15px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer;"
+                        onclick="updatePtManual('${s.ID}', event)">지급</button>
+            </div>
         </div>`;
     },
     renderCardActions(id, name) {
