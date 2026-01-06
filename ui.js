@@ -202,30 +202,27 @@ const UI = {
         return `
         <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 5px;">
             <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">빠른 금액 지급</p>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
                 ${[100, 300, 500].map(v => `
                     <button class="btn" 
                             style="background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); 
                                    padding: 14px 0; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.2s;"
-                            onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)';" 
-                            onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(255,255,255,0.15)';"
+                            onmouseover="this.style.background='var(--primary)';" 
+                            onmouseout="this.style.background='rgba(255,255,255,0.08)';"
                             onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>
                 `).join('')}
             </div>
             
             <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">직접 금액 입력</p>
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; align-items: stretch; gap: 8px; width: 100%;">
                 <input type="number" id="pt-inp-${s.ID}" placeholder="지급할 포인트를 입력하세요" 
-                       style="flex: 1; padding: 16px; background: rgba(0,0,0,0.3); border: 1.5px solid rgba(255,255,255,0.1); 
-                              border-radius: 12px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s;"
-                       onfocus="this.style.borderColor='var(--primary)'"
-                       onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+                       style="flex: 2; min-width: 0; padding: 16px; background: rgba(0,0,0,0.3); border: 1.5px solid rgba(255,255,255,0.1); 
+                              border-radius: 12px; color: #fff; font-size: 1.1rem; outline: none; box-sizing: border-box;">
+                
                 <button class="btn btn-primary" 
-                        style="padding: 0 30px; background: var(--primary); color: white; border: none; 
-                               border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: opacity 0.2s;"
-                        onmousedown="this.style.opacity='0.8'"
-                        onmouseup="this.style.opacity='1'"
-                        onclick="updatePtManual('${s.ID}', event)">지급하기</button>
+                        style="width: 100px; background: var(--primary); color: white; border: none; 
+                               border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; flex-shrink: 0;"
+                        onclick="updatePtManual('${s.ID}', event)">지급</button>
             </div>
         </div>`;
     }
