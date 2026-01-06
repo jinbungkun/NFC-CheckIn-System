@@ -107,6 +107,22 @@ const UI = {
             </div>`;
     },
 
+    renderCardActions(id, name) {
+    return `
+    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 5px;">
+        <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">새 카드 등록 대기</p>
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="new-card-input" placeholder="새 카드를 태그하세요" readonly
+                   style="flex: 1; padding: 14px; background: rgba(0,0,0,0.3); border: 1.5px solid var(--primary); 
+                          border-radius: 12px; color: #fff; font-size: 1rem; outline: none;">
+            <button class="btn btn-primary" 
+                    style="padding: 0 20px; background: var(--primary); color: white; border: none; 
+                           border-radius: 12px; font-weight: bold; cursor: pointer;"
+                    onclick="execCardChange('${id}', '${name}')">교체</button>
+        </div>
+    </div>`;
+},
+
     // 4. 신규 등록 폼 (스케줄 빌더 통합)
     renderRegisterForm() {
     window.tempSchedules = []; 
