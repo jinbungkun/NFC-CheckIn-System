@@ -109,47 +109,55 @@ const UI = {
 
     // 4. 신규 등록 폼 (스케줄 빌더 통합)
     renderRegisterForm() {
-        window.tempSchedules = []; 
-        window.selectedDay = "월"; 
-        
-        const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
-        let html = '';
+    window.tempSchedules = []; 
+    window.selectedDay = "월"; 
+    
+    const skipHeaders = ['포인트', '상태', '마지막출석', '등록일'];
+    let html = '';
 
-        currentHeaders.forEach(header => {
-            if (skipHeaders.includes(header)) return;
+    currentHeaders.forEach(header => {
+        if (skipHeaders.includes(header)) return;
 
-            html += `<div class="input-group">
-                        <label class="input-label">${header}</label>`;
+        html += `<div class="input-group">
+                    <label class="input-label">${header}</label>`;
 
-            if (header === 'ID') {
-                html += `<input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>`;
-            } 
-            else if (header === '수업스케줄') {
-                html += `
-                    <div id="day-selector-group" style="display:flex; gap:4px; margin-bottom:8px;">
-                        ${['월','화','수','목','금','토','일'].map(d => `
-                            <button type="button" class="day-btn ${d === '월' ? 'active' : ''}" 
-                                    onclick="UI.selectDay(this, '${d}')" 
-                                    style="flex:1; padding:10px 0; border:1px solid #ddd; border-radius:6px; background:white; cursor:pointer; font-weight:bold;">
-                                ${d}
-                            </button>
-                        `).join('')}
-                    </div>
-                    <div class="builder-controls" style="display:flex; gap:5px;">
-                        <input type="time" id="reg-time" class="modern-input" style="flex:1;">
-                        <button type="button" onclick="addScheduleTag()" class="btn btn-primary" style="padding:0 20px; font-size:1.2rem;">+</button>
-                    </div>
-                    <div id="schedule-tags-container" style="margin-top:10px; border:2px dashed #eee; padding:12px; border-radius:8px; min-height:50px; display:flex; flex-wrap:wrap; gap:6px;">
-                        <span style="color:var(--muted); font-size:0.85rem;">수업 시간을 추가해주세요.</span>
-                    </div>`;
-            } 
-            else {
-                html += `<input type="text" id="field-${header}" class="modern-input" placeholder="${header} 입력">`;
-            }
-            html += `</div>`;
-        });
-        return html;
-    },
+        if (header === 'ID') {
+            html += `<input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>`;
+        } 
+        else if (header === '수업스케줄') {
+            html += `
+                <style>
+                    /* 시간 선택 아이콘(시계)을 하얗게 반전 */
+                    #reg-time::-webkit-calendar-picker-indicator {
+                        filter: invert(100%);
+                        cursor: pointer;
+                    }
+                </style>
+                <div id="day-selector-group" style="display:flex; gap:4px; margin-bottom:8px;">
+                    ${['월','화','수','목','금','토','일'].map(d => `
+                        <button type="button" class="day-btn ${d === '월' ? 'active' : ''}" 
+                                onclick="UI.selectDay(this, '${d}')" 
+                                style="flex:1; padding:10px 0; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(255,255,255,0.1); color:white; cursor:pointer; font-weight:bold;">
+                            ${d}
+                        </button>
+                    `).join('')}
+                </div>
+                <div class="builder-controls" style="display:flex; gap:5px;">
+                    <input type="time" id="reg-time" class="modern-input" 
+                           style="flex:1; background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                    <button type="button" onclick="addScheduleTag()" class="btn btn-primary" style="padding:0 20px; font-size:1.2rem;">+</button>
+                </div>
+                <div id="schedule-tags-container" style="margin-top:10px; border:2px dashed rgba(255,255,255,0.1); padding:12px; border-radius:8px; min-height:50px; display:flex; flex-wrap:wrap; gap:6px;">
+                    <span style="color:var(--muted); font-size:0.85rem;">수업 시간을 추가해주세요.</span>
+                </div>`;
+        } 
+        else {
+            html += `<input type="text" id="field-${header}" class="modern-input" placeholder="${header} 입력">`;
+        }
+        html += `</div>`;
+    });
+    return html;
+},
 
     // 요일 버튼 선택 함수
     selectDay(btn, day) {
