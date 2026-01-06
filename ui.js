@@ -124,10 +124,22 @@ const UI = {
         if (header === 'ID') {
             html += `<input type="text" id="Register" class="modern-input" placeholder="카드를 찍으세요" readonly>`;
         } 
+        // [추가] 생년월일 항목은 달력(date)으로 표시
+        else if (header === '생년월일') {
+            html += `
+                <style>
+                    /* 달력 아이콘도 시계처럼 하얗게 반전 */
+                    #field-생년월일::-webkit-calendar-picker-indicator {
+                        filter: invert(100%);
+                        cursor: pointer;
+                    }
+                </style>
+                <input type="date" id="field-${header}" class="modern-input" 
+                       style="background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.2); width:100%;">`;
+        }
         else if (header === '수업스케줄') {
             html += `
                 <style>
-                    /* 시간 선택 아이콘(시계)을 하얗게 반전 */
                     #reg-time::-webkit-calendar-picker-indicator {
                         filter: invert(100%);
                         cursor: pointer;
