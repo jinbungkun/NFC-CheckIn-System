@@ -31,13 +31,31 @@ window.onload = async () => {
     if (!url) {
         showPage('settings');
     } else {
-        await refreshSchema();
-        await initQuickMap();
+        // [수정] 수동으로 로더를 켭니다.
+        const loader = document.getElementById('loader');
+        if (loader) loader.style.display = 'flex';
+        isApiLoading = true;
+
+        try {
+            // 1. 시트 헤더 정보 로드
+            await refreshSchema(true); 
+            // 2. 퀵맵(전체 학생 데이터) 로드 - 반드시 끝날 때까지 기다림
+            await initQuickMap();
+            
+            console.log("모든 데이터 로드 완료");
+        } catch (e) {
+            console.error("초기 로딩 오류:", e);
+        } finally {
+            // 모든 데이터 로드가 진짜 끝났을 때 로더를 끕니다.
+            if (loader) loader.style.display = 'none';
+            isApiLoading = false;
+            updateFocusUI();
+            focusNfc();
+        }
     }
 
     initFocusGuard();
     updateFocusUI();
-    // 초기 로딩 후 포커스 강제
     setTimeout(focusNfc, 500);
     setInterval(focusNfc, 2000);
 };
@@ -73,14 +91,21 @@ async function callApi(data, showLoader = true) {
 }
 
 async function initQuickMap() {
-    const res = await callApi({ action: 'getQuickMap' }, false);
+    // 두 번째 인자를 true로 바꾸거나, 위에서 수동 제어하므로 그대로 두어도 되지만
+    // 확실하게 하기 위해 await를 보장합니다.
+    const res = await callApi({ action: 'getQuickMap' }, false); 
     if (res && res.success) {
         quickMap = res.data;
-        console.log("데이터 동기화 완료:", Object.keys(quickMap).length, "명");
-
+        
+        // 데이터가 로드된 후 스케줄 보드 같은 전역 UI도 갱신해줍니다.
         const activePage = document.querySelector('.page.active');
         if (activePage) {
             const pageType = activePage.id.replace('page-', '');
+            
+            // 스케줄 페이지라면 대시보드 즉시 갱신
+            if (pageType === 'schedule') updateScheduleDashboard();
+            
+            // 검색창에 값이 이미 있다면 결과 다시 출력
             const input = document.getElementById(PAGE_CONFIG[pageType]?.inputId);
             if (input && input.value) findStudent(pageType);
         }
