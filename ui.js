@@ -91,16 +91,17 @@ const UI = {
             <div class="student-simple-card" 
                  style="background: var(--card-bg, rgba(255,255,255,0.05)); 
                         border: 1px solid var(--border, rgba(255,255,255,0.1)); 
-                        border-radius: 16px; padding: 20px; margin-bottom: 15px; 
-                        backdrop-filter: blur(10px); color: var(--text-main, #fff);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        border-radius: 16px; padding: 24px; margin-bottom: 20px; 
+                        backdrop-filter: blur(10px); color: var(--text-main, #fff);
+                        box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
                     <div>
-                        <strong style="font-size: 1.2rem; display: block;">${s.이름}</strong>
-                        <span style="font-size: 0.9rem; color: var(--accent, #ffd700); font-weight: 600;">
-                            💰 ${Number(s.포인트).toLocaleString()} pt
+                        <strong style="font-size: 1.3rem; display: block; margin-bottom: 4px;">${s.이름}</strong>
+                        <span style="font-size: 1.0rem; color: var(--accent, #ffd700); font-weight: 700;">
+                            💰 현재 잔액: ${Number(s.포인트).toLocaleString()} pt
                         </span>
                     </div>
-                    <span style="font-size: 0.85rem; color: var(--muted, #aaa);">${s.전화번호 || ''}</span>
+                    <span style="font-size: 0.9rem; color: var(--muted, #aaa); opacity: 0.8;">${s.전화번호 || '연락처 없음'}</span>
                 </div>
                 ${actionHtml}
             </div>`;
@@ -199,30 +200,34 @@ const UI = {
     // 6. 포인트/7. 카드교체 액션 (기존 유지)
   renderPointActions(s) {
         return `
-        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 5px;">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
-                ${[10, 50, 100].map(v => `
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 5px;">
+            <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">빠른 금액 지급</p>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                ${[100, 300, 500].map(v => `
                     <button class="btn" 
-                            style="background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); 
-                                   padding: 10px 0; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s;"
-                            onmouseover="this.style.background='var(--primary)'" 
-                            onmouseout="this.style.background='rgba(255,255,255,0.1)'"
+                            style="background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); 
+                                   padding: 14px 0; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.2s;"
+                            onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)';" 
+                            onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(255,255,255,0.15)';"
                             onclick="updatePt('${s.ID}', ${v}, event)">+${v}</button>
                 `).join('')}
             </div>
-            <div style="display: flex; gap: 8px;">
-                <input type="number" id="pt-inp-${s.ID}" placeholder="금액 입력" 
-                       style="flex: 1; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); 
-                              border-radius: 10px; color: #fff; font-size: 0.95rem; margin:0;">
+            
+            <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">직접 금액 입력</p>
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="pt-inp-${s.ID}" placeholder="지급할 포인트를 입력하세요" 
+                       style="flex: 1; padding: 16px; background: rgba(0,0,0,0.3); border: 1.5px solid rgba(255,255,255,0.1); 
+                              border-radius: 12px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s;"
+                       onfocus="this.style.borderColor='var(--primary)'"
+                       onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
                 <button class="btn btn-primary" 
-                        style="padding: 0 20px; background: var(--primary); color: white; border: none; 
-                               border-radius: 10px; font-weight: bold; cursor: pointer;"
-                        onclick="updatePtManual('${s.ID}', event)">지급</button>
+                        style="padding: 0 30px; background: var(--primary); color: white; border: none; 
+                               border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: opacity 0.2s;"
+                        onmousedown="this.style.opacity='0.8'"
+                        onmouseup="this.style.opacity='1'"
+                        onclick="updatePtManual('${s.ID}', event)">지급하기</button>
             </div>
         </div>`;
-    },
-    renderCardActions(id, name) {
-        return `<button class="btn btn-danger" style="width:100%; margin-top:10px;" onclick="execCardChange('${id}', '${name}')">새 카드로 교체</button>`;
     }
 };
 
