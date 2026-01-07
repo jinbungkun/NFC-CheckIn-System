@@ -85,43 +85,72 @@ const UI = {
     },
 
     // 3. 심플 카드 (포인트/카드 교체용)
-  renderSimpleCard(s, type) {
+renderSimpleCard(s, type) {
         const actionHtml = type === 'point' ? this.renderPointActions(s) : this.renderCardActions(s.ID, s.이름);
+        
+        // 카드교체 타입일 때만 상단에 '카드 교체 대상' 배지 추가
+        const badgeHtml = type === 'card' ? 
+            `<span style="background:rgba(255, 107, 107, 0.2); color:#ff6b6b; padding:4px 10px; border-radius:8px; font-size:0.75rem; font-weight:bold; margin-bottom:12px; display:inline-block; border:1px solid rgba(255,107,107,0.3);">CARD REPLACEMENT</span>` : "";
+
         return `
             <div class="student-simple-card" 
-                 style="background: var(--card-bg, rgba(255,255,255,0.05)); 
-                        border: 1px solid var(--border, rgba(255,255,255,0.1)); 
-                        border-radius: 16px; padding: 24px; margin-bottom: 20px; 
-                        backdrop-filter: blur(10px); color: var(--text-main, #fff);
-                        box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                 style="background: rgba(255, 255, 255, 0.07); 
+                        border: 1px solid rgba(255, 255, 255, 0.1); 
+                        border-radius: 20px; padding: 28px; margin-bottom: 24px; 
+                        backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                        transition: transform 0.2s ease;">
+                ${badgeHtml}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
                     <div>
-                        <strong style="font-size: 1.3rem; display: block; margin-bottom: 4px;">${s.이름}</strong>
-                        <span style="font-size: 1.0rem; color: var(--accent, #ffd700); font-weight: 700;">
-                            💰 현재 잔액: ${Number(s.포인트).toLocaleString()} pt
-                        </span>
+                        <h3 style="font-size: 1.5rem; margin: 0 0 6px 0; color: #fff; letter-spacing: -0.5px;">${s.이름}</h3>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span style="font-size: 0.9rem; color: rgba(255,255,255,0.5);">${s.전화번호 || '연락처 없음'}</span>
+                            <span style="width:1px; height:10px; background:rgba(255,255,255,0.2);"></span>
+                            <span style="font-size: 0.9rem; color: var(--accent); font-weight: 600;">현재 ${Number(s.포인트).toLocaleString()} pt</span>
+                        </div>
                     </div>
-                    <span style="font-size: 0.9rem; color: var(--muted, #aaa); opacity: 0.8;">${s.전화번호 || '연락처 없음'}</span>
+                    <div style="text-align: right;">
+                         <div style="font-size: 0.7rem; color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 4px;">Current ID</div>
+                         <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; color: #888; font-size: 0.8rem;">${s.ID.substring(0, 8)}...</code>
+                    </div>
                 </div>
                 ${actionHtml}
             </div>`;
     },
 
     renderCardActions(id, name) {
-    return `
-    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 5px;">
-        <p style="font-size: 0.85rem; color: var(--muted, #aaa); margin-bottom: 12px; font-weight: 600;">새 카드 등록 대기</p>
-        <div style="display: flex; gap: 8px;">
-            <input type="text" id="new-card-input" placeholder="새 카드를 태그하세요" readonly
-                   style="flex: 1; padding: 14px; background: rgba(0,0,0,0.3); border: 1.5px solid var(--primary); 
-                          border-radius: 12px; color: #fff; font-size: 1rem; outline: none;">
-            <button class="btn btn-primary" 
-                    style="padding: 0 20px; background: var(--primary); color: white; border: none; 
-                           border-radius: 12px; font-weight: bold; cursor: pointer;"
-                    onclick="execCardChange('${id}', '${name}')">교체</button>
-        </div>
-    </div>`;
-},
+        return `
+        <div style="background: rgba(0, 0, 0, 0.2); border-radius: 16px; padding: 20px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                <div style="width: 8px; height: 8px; background: #ff4757; border-radius: 50%; box-shadow: 0 0 10px #ff4757;"></div>
+                <p style="font-size: 0.9rem; color: #eee; font-weight: 600; margin: 0;">새 카드 태그 대기 중...</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="position: relative;">
+                    <input type="text" id="new-card-input" placeholder="카드를 리더기에 찍어주세요" readonly
+                           style="width: 100%; padding: 18px; padding-left: 45px; background: rgba(255,255,255,0.05); 
+                                  border: 2px dashed rgba(255,255,255,0.2); border-radius: 14px; color: #00ff88; 
+                                  font-size: 1.1rem; font-family: monospace; outline: none; transition: all 0.3s;
+                                  box-sizing: border-box;">
+                    <span style="position: absolute; left: 18px; top: 50%; transform: translateY(-50%); opacity: 0.5;">🎴</span>
+                </div>
+                
+                <button class="btn-change" 
+                        style="width: 100%; padding: 16px; background: linear-gradient(135deg, #6c5ce7, #a29bfe); 
+                               color: white; border: none; border-radius: 14px; font-weight: 800; font-size: 1rem; 
+                               cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);"
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(108, 92, 231, 0.4)';"
+                        onmouseout="this.style.transform='translateY(0)';"
+                        onclick="execCardChange('${id}', '${name}')">
+                    카드 정보 업데이트 승인
+                </button>
+            </div>
+            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 15px; text-align: center;">
+                * 기존 카드는 즉시 무효화되며 새 카드로 모든 정보가 이전됩니다.
+            </p>
+        </div>`;
+    },
 
     // 4. 신규 등록 폼 (스케줄 빌더 통합)
     renderRegisterForm() {
