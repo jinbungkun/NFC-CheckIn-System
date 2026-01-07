@@ -99,7 +99,7 @@ renderSimpleCard(s, type) {
                         border-radius: 20px; padding: 28px; margin-bottom: 24px; 
                         backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.3);
                         transition: transform 0.2s ease;">
-                ${badgeHtml}
+                ${badgeHtml}to
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
                     <div>
                         <h3 style="font-size: 1.5rem; margin: 0 0 6px 0; color: #fff; letter-spacing: -0.5px;">${s.이름}</h3>
@@ -232,35 +232,57 @@ renderSimpleCard(s, type) {
 
     // 5. 출석 현황판
     renderScheduleBoard(groupedData, summary) {
-        const board = document.getElementById('schedule-board'); 
-        const summaryDiv = document.getElementById('schedule-summary');
-        if (!board || !summaryDiv) return;
+    const board = document.getElementById('schedule-board'); 
+    const summaryDiv = document.getElementById('schedule-summary');
+    if (!board || !summaryDiv) return;
 
-        summaryDiv.innerHTML = `
-            <div class="summary-card total"><span class="label">대상</span><span class="value">${summary.total}</span></div>
-            <div class="summary-card present"><span class="label">출석</span><span class="value">${summary.present}</span></div>
-            <div class="summary-card absent"><span class="label">미출석</span><span class="value">${summary.absent}</span></div>`;
+    // [추가] 오늘 날짜 구하기 (MM-DD 형식)
+    const now = new Date();
+    const todayStr = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-        board.innerHTML = "";
-        const sortedTimes = Object.keys(groupedData).sort();
+    summaryDiv.innerHTML = `
+        <div class="summary-card total"><span class="label">대상</span><span class="value">${summary.total}</span></div>
+        <div class="summary-card present"><span class="label">출석</span><span class="value">${summary.present}</span></div>
+        <div class="summary-card absent"><span class="label">미출석</span><span class="value">${summary.absent}</span></div>`;
 
-        if (sortedTimes.length === 0) {
-            board.innerHTML = `<p style="text-align:center; padding:50px; color:var(--muted);">오늘 수업이 없습니다.</p>`;
-            return;
-        }
+    board.innerHTML = "";
+    const sortedTimes = Object.keys(groupedData).sort();
 
-        sortedTimes.forEach(time => {
-            const section = document.createElement('div');
-            section.className = "time-section";
-            const studentCards = groupedData[time].map(s => `
-                <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'}">
-                    <div class="name">${s.name}</div>
-                    <div class="status-indicator">${s.isPresent ? '출석완료' : '미출석'}</div>
-                </div>`).join('');
-            section.innerHTML = `<div class="time-header">🕒 ${time}</div><div class="student-grid">${studentCards}</div>`;
-            board.appendChild(section);
-        });
-    },
+    if (sortedTimes.length === 0) {
+        board.innerHTML = `<p style="text-align:center; padding:50px; color:var(--muted);">오늘 수업이 없습니다.</p>`;
+        return;
+    }
+
+    sortedTimes.forEach(time => {
+        const section = document.createElement('div');
+        section.className = "time-section";
+        const studentCards = groupedData[time].map(s => {
+            
+            // [추가] 생일 여부 확인 (s.birth에 "MM-DD"가 포함되어 있는지 체크)
+            const isBirthday = s.birth && s.birth.includes(todayStr);
+            
+            return `
+                <div class="student-status-card ${s.isPresent ? 'is-present' : 'is-absent'}" 
+                     style="${isBirthday ? 'border: 2px solid #ff6b81; background: rgba(255,107,129,0.1); position:relative;' : ''}">
+                    
+                    ${isBirthday ? `
+                        <div style="position:absolute; top:-2px; right:-2px; background:#ff6b81; color:white; padding:2px 6px; font-size:0.65rem; font-weight:bold; border-radius:0 0 0 8px;">
+                            BIRTHDAY
+                        </div>` : ''}
+                    
+                    <div class="name" style="${isBirthday ? 'color:#ff6b81; font-weight:bold;' : ''}">
+                        ${s.name} ${isBirthday ? '🎂' : ''}
+                    </div>
+                    <div class="status-indicator">
+                        ${isBirthday && !s.isPresent ? '<span style="font-size:0.7rem; display:block; color:#ff6b81;">오늘 생일!</span>' : ''}
+                        ${s.isPresent ? '출석완료' : '미출석'}
+                    </div>
+                </div>`;
+        }).join('');
+        section.innerHTML = `<div class="time-header">🕒 ${time}</div><div class="student-grid">${studentCards}</div>`;
+        board.appendChild(section);
+    });
+},
 
     // 6. 포인트/7. 카드교체 액션 (기존 유지)
   renderPointActions(s) {
