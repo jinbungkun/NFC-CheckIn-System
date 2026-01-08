@@ -1,13 +1,13 @@
 {
   "name": "도장 통합 관리 시스템",
   "short_name": "도장관리",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#121212",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/5836/5836640.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
