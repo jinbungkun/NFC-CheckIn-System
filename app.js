@@ -155,6 +155,7 @@ function findByNfc(id, pageType) {
    ========================================================================== */
 async function doCheckin() {
     const inputEl = document.getElementById(PAGE_CONFIG.checkin.inputId);
+    console.log(`입력값`,inputEl);
     if (!inputEl) return;
     
     let inputVal = inputEl.value.trim();
