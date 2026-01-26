@@ -154,41 +154,65 @@ function findByNfc(id, pageType) {
    [Module 4] 주요 기능: 출석 체크
    ========================================================================== */
 async function doCheckin() {
-    const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
-    if (!input) return;
-    const id = input.value.trim();
-    if (!id) return;
-    input.value = "";
+    const inputEl = document.getElementById(PAGE_CONFIG.checkin.inputId);
+    if (!inputEl) return;
+    
+    let inputVal = inputEl.value.trim();
+    if (!inputVal) return;
+    inputEl.value = ""; 
 
-    const student = quickMap[id];
-    const today = new Date().toLocaleDateString('sv-SE');
+    let student = null;
+    let targetId = null;
 
-    // 1. 이미 출석한 경우: 현재 포인트 표시
-    if (student && student.lastDate === today) {
-        renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)", student.point);
-        return;
+    // 1. 입력값이 숫자 형태의 문자열인지 확인 (예: "1234", "0056")
+    // isNaN은 "123"을 숫자로 취급하여 false를 반환합니다.
+    if (!isNaN(inputVal) && inputVal !== "") {
+        targetId = inputVal; 
+        student = quickMap[targetId]; // Key가 "0001" 형태여도 그대로 매칭
+    } 
+    
+    // 2. ID로 찾지 못했거나 입력값이 순수 문자인 경우 (이름으로 검색)
+    if (!student) {
+        const foundEntry = Object.entries(quickMap).find(([id, s]) => s.name === inputVal);
+        if (foundEntry) {
+            targetId = foundEntry[0]; // 해당 학생의 실제 ID(문자열 숫자)를 가져옴
+            student = foundEntry[1];
+            console.log(`이름으로 검색 성공: ${inputVal} -> ID: ${targetId}`);
+        }
     }
 
-    // 2. 처음 출석하는 경우
+    const today = new Date().toLocaleDateString('sv-SE');
+
+    // [출석 처리 로직]
     if (student) {
+        if (student.lastDate === today) {
+            renderCheckinUI(student.name, "이미 오늘 출석했습니다! ⚠️", "var(--accent)", student.point);
+            return;
+        }
+
         renderCheckinUI(student.name, "출석 성공! ✅", "var(--success)", student.point);
-        
         student.lastDate = today;
-        callApi({ action: 'checkin', id: id, row: student.row }, false).then(res => {
+        
+        // 서버에는 찾은 targetId(문자열 숫자)를 전송
+        callApi({ action: 'checkin', id: String(targetId), row: student.row }, false).then(res => {
             if (!res || !res.success) {
                 renderCheckinUI(student.name, "⚠️ 서버 저장 실패", "var(--danger)");
             }
         });
     } 
-    // 3. 신규 또는 미등록
+    // 3. 신규 또는 미등록 처리
     else {
-        const res = await callApi({ action: 'checkin', id: id }, true);
-        if (res && res.success) {
-            renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point);
-            await initQuickMap();
+        // 입력값이 숫자 형태라면 신규 카드 등록 시도
+        if (!isNaN(inputVal)) {
+            const res = await callApi({ action: 'checkin', id: inputVal }, true);
+            if (res && res.success) {
+                renderCheckinUI(res.name, "신규 출석 성공! ✅", "var(--success)", res.point);
+                await initQuickMap();
+            } else {
+                renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)", null);
+            }
         } else {
-            // 미등록 시 포인트 자리는 null로 전달
-            renderCheckinUI("미등록", "등록되지 않은 카드입니다.", "var(--danger)", null);
+            renderCheckinUI("미등록", `[${inputVal}] 학생을 찾을 수 없습니다.`, "var(--danger)", null);
         }
     }
 }
