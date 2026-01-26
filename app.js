@@ -592,6 +592,7 @@ function processNfc(val) {
         if (idInp) idInp.value = val;
     } else if (pageType === 'checkin') {
         const input = document.getElementById(PAGE_CONFIG.checkin.inputId);
+         console.log("nfc",input);
         if (input) {
             input.value = val;
             doCheckin();
